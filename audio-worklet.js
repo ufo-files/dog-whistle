@@ -63,7 +63,7 @@ class DogWhistleProcessor extends AudioWorkletProcessor {
       const harmonic = sine(SIGNAL.harmonicHz, t) * SIGNAL.harmonicGain;
       const pingEnvelopeValue = pingEnvelope(t);
       const ping = sine(SIGNAL.pingHz, t) * pingEnvelopeValue * SIGNAL.pingGain;
-      const pingVisual = pingEnvelopeValue * SIGNAL.pingGain * 2.4;
+      const pingVisual = Math.sin(TWO_PI * 9 * t) * pingEnvelopeValue * SIGNAL.pingGain * 3.4;
       const chirp = sampleChirp(t);
       const pad = sine(SIGNAL.padHz, t) * SIGNAL.padGain;
       const breathLeft = breathLayer(t, this.binaural ? "left" : "center") * SIGNAL.breathGain;

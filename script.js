@@ -27,7 +27,7 @@ const SPHERE_LAYER_GAIN = {
   carrier: 1,
   pad: 1.08,
   harmonic: 1.18,
-  ping: 1.35,
+  ping: 3.6,
   chirp: 1.75,
   breath: 1.3,
 };
@@ -35,7 +35,7 @@ const SPHERE_LAYER_ENERGY_GAIN = {
   carrier: .48,
   pad: .55,
   harmonic: .68,
-  ping: 1.1,
+  ping: 2.8,
   chirp: 1.7,
   breath: .9,
 };
