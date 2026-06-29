@@ -135,9 +135,8 @@ function breathLayer(t, ear = "center") {
   const offset = ear === "right" ? .037 : 0;
   const noiseTime = t + offset;
   const cycle = positiveModulo(t + .35, 5.6) / 5.6;
-  const inhale = cycle < .38 ? smoothstep(cycle / .38) : 1 - smoothstep((cycle - .38) / .62);
-  const exhale = cycle < .2 ? smoothstep(cycle / .2) : 1 - smoothstep((cycle - .2) / .8);
-  const envelope = .08 + inhale * .12 + exhale * .72;
+  const breathPhase = cycle < .5 ? smoothstep(cycle / .5) : 1 - smoothstep((cycle - .5) / .5);
+  const envelope = .16 + breathPhase * .66;
   const chest = .94 + .035 * sine(.17, t + .2) + .025 * sine(.29, t + 1.3);
   const air =
     interpolatedNoise(noiseTime * 85) * .2 +

@@ -39,7 +39,7 @@ const SPHERE_LAYER_ENERGY_GAIN = {
   chirp: 1.7,
   breath: .9,
 };
-const SPHERE_BREATH_CORE_RADIUS = .37;
+const SPHERE_BREATH_CORE_RADIUS = .34;
 const SPHERE_PHASE_AXES = [
   { x: .742, y: .284, z: .607, weight: .34, offset: .07 },
   { x: -.386, y: .813, z: .436, weight: .31, offset: .29 },
@@ -498,10 +498,10 @@ function updateSphereLedLayer({ ledLayer, metrics, active }) {
   const eventLift = layerPeak * energyGain * SPHERE_ENERGY_SCALE * active;
   const isBreath = ledLayer.layer.id === "breath";
   const baseRadius = isBreath ? SPHERE_BREATH_CORE_RADIUS : SPHERE_RADIUS;
-  const targetCoreSwell = isBreath ? smoothstep(clamp(layerEnergy / .0028, 0, 1)) * .29 * active : 0;
-  const coreSwell = isBreath ? lerp(ledLayer.swell || 0, targetCoreSwell, .035) : 0;
-  const waveformScale = isBreath ? .18 : 1;
-  const energyScale = isBreath ? .18 : 1;
+  const targetCoreSwell = isBreath ? smoothstep(clamp(layerEnergy / .0028, 0, 1)) * .38 * active : 0;
+  const coreSwell = isBreath ? lerp(ledLayer.swell || 0, targetCoreSwell, .06) : 0;
+  const waveformScale = isBreath ? .12 : 1;
+  const energyScale = isBreath ? .14 : 1;
   const eventComponent = isBreath ? 0 : eventLift;
   const mixedEnergyComponent = isBreath ? 0 : metrics.energy * SPHERE_ENERGY_SCALE * .12 * active;
   const positions = ledLayer.geometry.attributes.position.array;
