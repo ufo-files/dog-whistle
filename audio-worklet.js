@@ -15,6 +15,7 @@ const SIGNAL = {
   chirpGain: .058,
   padGain: .035,
   breathGain: .068,
+  breathCycleSeconds: 8.4,
 };
 
 class DogWhistleProcessor extends AudioWorkletProcessor {
@@ -45,19 +46,20 @@ class DogWhistleProcessor extends AudioWorkletProcessor {
     const right = output[1] || left;
     const leftCarrierHz = this.binaural ? SIGNAL.baseHz - SIGNAL.binauralBeatHz / 2 : SIGNAL.baseHz;
     const rightCarrierHz = this.binaural ? SIGNAL.baseHz + SIGNAL.binauralBeatHz / 2 : SIGNAL.baseHz;
-    const visual = new Float32Array(left.length * 14);
+    const visual = new Float32Array(left.length * 15);
 
     for (let i = 0; i < left.length; i += 1) {
-      const offset = i * 14;
+      const offset = i * 15;
       if (!this.playing) {
         left[i] = 0;
         right[i] = 0;
-        for (let slot = 0; slot < 14; slot += 1) visual[offset + slot] = 0;
+        for (let slot = 0; slot < 15; slot += 1) visual[offset + slot] = 0;
         continue;
       }
 
       const t = currentTime + i / sampleRate - this.startedAt;
       const pulse = this.mode === "pulse" ? pulseEnvelope(t) : 1;
+      const breathMotion = breathPhase(t);
       const carrierLeft = sine(leftCarrierHz, t) * SIGNAL.carrierGain;
       const carrierRight = sine(rightCarrierHz, t) * SIGNAL.carrierGain;
       const harmonic = sine(SIGNAL.harmonicHz, t) * SIGNAL.harmonicGain;
@@ -87,6 +89,7 @@ class DogWhistleProcessor extends AudioWorkletProcessor {
       visual[offset + 11] = pad * pulse;
       visual[offset + 12] = breathLeft * pulse;
       visual[offset + 13] = breathRight * pulse;
+      visual[offset + 14] = breathMotion * pulse;
     }
 
     this.port.postMessage(visual, [visual.buffer]);
@@ -134,9 +137,7 @@ function pulseEnvelope(t) {
 function breathLayer(t, ear = "center") {
   const offset = ear === "right" ? .037 : 0;
   const noiseTime = t + offset;
-  const cycle = positiveModulo(t + .35, 5.6) / 5.6;
-  const breathPhase = cycle < .5 ? smoothstep(cycle / .5) : 1 - smoothstep((cycle - .5) / .5);
-  const envelope = .16 + breathPhase * .66;
+  const envelope = .16 + breathPhase(t) * .66;
   const chest = .94 + .035 * sine(.17, t + .2) + .025 * sine(.29, t + 1.3);
   const air =
     interpolatedNoise(noiseTime * 85) * .2 +
@@ -149,6 +150,11 @@ function breathLayer(t, ear = "center") {
     interpolatedNoise(noiseTime * 3400) * .018;
   const mouth = .82 + .08 * unipolarSine(.37, t + 1.6) + .05 * unipolarSine(.71, t);
   return softClip(air * envelope * chest * mouth);
+}
+
+function breathPhase(t) {
+  const cycle = positiveModulo(t + .35, SIGNAL.breathCycleSeconds) / SIGNAL.breathCycleSeconds;
+  return cycle < .5 ? smoothstep(cycle / .5) : 1 - smoothstep((cycle - .5) / .5);
 }
 
 function sine(frequency, t) {

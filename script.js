@@ -11,6 +11,7 @@ const statusEl = document.getElementById("status");
 const TWO_PI = Math.PI * 2;
 const THREE_CDN_URL = "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js";
 const VISUAL_HISTORY_LENGTH = 4096;
+const WORKLET_FRAME_SIZE = 15;
 const TRACE_RGB = "17, 17, 17";
 const CARRIER_VISUAL_REFERENCE_GAIN = .115;
 const SPHERE_RADIUS = 1.18;
@@ -73,6 +74,7 @@ const state = {
   liveWriteIndex: 0,
   liveChannels: createLiveChannels(VISUAL_HISTORY_LENGTH),
   liveLayers: createLiveLayers(VISUAL_HISTORY_LENGTH),
+  liveBreathEnvelope: new Float32Array(VISUAL_HISTORY_LENGTH),
 };
 
 const sphereState = {
@@ -134,13 +136,14 @@ function ensureLiveChannelSize() {
   state.liveWriteIndex = 0;
   state.liveChannels = createLiveChannels(VISUAL_HISTORY_LENGTH);
   state.liveLayers = createLiveLayers(VISUAL_HISTORY_LENGTH);
+  state.liveBreathEnvelope = new Float32Array(VISUAL_HISTORY_LENGTH);
 }
 
 function writeWorkletFrameBlock(block) {
   if (!block || !block.length) return;
   ensureLiveChannelSize();
 
-  for (let offset = 0; offset < block.length; offset += 14) {
+  for (let offset = 0; offset < block.length; offset += WORKLET_FRAME_SIZE) {
     const index = state.liveWriteIndex;
     state.liveChannels.left[index] = block[offset];
     state.liveChannels.right[index] = block[offset + 1];
@@ -156,6 +159,7 @@ function writeWorkletFrameBlock(block) {
     state.liveLayers.pad.right[index] = block[offset + 11];
     state.liveLayers.breath.left[index] = block[offset + 12];
     state.liveLayers.breath.right[index] = block[offset + 13];
+    state.liveBreathEnvelope[index] = block[offset + 14];
     state.liveWriteIndex = (index + 1) % VISUAL_HISTORY_LENGTH;
   }
 }
@@ -498,10 +502,11 @@ function updateSphereLedLayer({ ledLayer, metrics, active }) {
   const eventLift = layerPeak * energyGain * SPHERE_ENERGY_SCALE * active;
   const isBreath = ledLayer.layer.id === "breath";
   const baseRadius = isBreath ? SPHERE_BREATH_CORE_RADIUS : SPHERE_RADIUS;
-  const targetCoreSwell = isBreath ? smoothstep(clamp(layerEnergy / .0028, 0, 1)) * .38 * active : 0;
+  const breathMotion = isBreath ? latestLiveSample(state.liveBreathEnvelope) : 0;
+  const targetCoreSwell = isBreath ? smoothstep(clamp(breathMotion, 0, 1)) * .34 * active : 0;
   const coreSwell = isBreath ? lerp(ledLayer.swell || 0, targetCoreSwell, .06) : 0;
-  const waveformScale = isBreath ? .12 : 1;
-  const energyScale = isBreath ? .14 : 1;
+  const waveformScale = isBreath ? 0 : 1;
+  const energyScale = isBreath ? 0 : 1;
   const eventComponent = isBreath ? 0 : eventLift;
   const mixedEnergyComponent = isBreath ? 0 : metrics.energy * SPHERE_ENERGY_SCALE * .12 * active;
   const positions = ledLayer.geometry.attributes.position.array;
@@ -536,6 +541,11 @@ function resetSphereDisplacementMemory() {
     ledLayer.displacements.fill(0);
     ledLayer.swell = 0;
   });
+}
+
+function latestLiveSample(samples) {
+  const index = positiveModulo(state.liveWriteIndex - 1, samples.length);
+  return samples[index] || 0;
 }
 
 function sphereSignalMetrics(left, right) {
