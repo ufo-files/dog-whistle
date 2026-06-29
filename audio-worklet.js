@@ -14,7 +14,7 @@ const SIGNAL = {
   pingGain: .012,
   chirpGain: .058,
   padGain: .035,
-  breathGain: .055,
+  breathGain: .068,
 };
 
 class DogWhistleProcessor extends AudioWorkletProcessor {
@@ -137,19 +137,18 @@ function breathLayer(t, ear = "center") {
   const cycle = positiveModulo(t + .35, 5.6) / 5.6;
   const inhale = cycle < .38 ? smoothstep(cycle / .38) : 1 - smoothstep((cycle - .38) / .62);
   const exhale = cycle < .2 ? smoothstep(cycle / .2) : 1 - smoothstep((cycle - .2) / .8);
-  const envelope = .06 + inhale * .14 + exhale * .8;
-  const chest = .9 + .06 * sine(.17, t + .2) + .04 * sine(.29, t + 1.3);
+  const envelope = .08 + inhale * .12 + exhale * .72;
+  const chest = .94 + .035 * sine(.17, t + .2) + .025 * sine(.29, t + 1.3);
   const air =
-    interpolatedNoise(noiseTime * 42) * .26 +
-    interpolatedNoise(noiseTime * 95) * .22 +
-    interpolatedNoise(noiseTime * 190) * .16 +
-    interpolatedNoise(noiseTime * 360) * .1 +
-    interpolatedNoise(noiseTime * 720) * .06 +
-    interpolatedNoise(noiseTime * 1150) * .048 +
-    interpolatedNoise(noiseTime * 1800) * .032 +
-    interpolatedNoise(noiseTime * 2600) * .018 +
-    interpolatedNoise(noiseTime * 3400) * .01;
-  const mouth = .78 + .14 * unipolarSine(.11, t + 1.6) + .08 * unipolarSine(.23, t);
+    interpolatedNoise(noiseTime * 85) * .2 +
+    interpolatedNoise(noiseTime * 180) * .2 +
+    interpolatedNoise(noiseTime * 360) * .17 +
+    interpolatedNoise(noiseTime * 720) * .13 +
+    interpolatedNoise(noiseTime * 1150) * .09 +
+    interpolatedNoise(noiseTime * 1800) * .058 +
+    interpolatedNoise(noiseTime * 2600) * .034 +
+    interpolatedNoise(noiseTime * 3400) * .018;
+  const mouth = .82 + .08 * unipolarSine(.37, t + 1.6) + .05 * unipolarSine(.71, t);
   return softClip(air * envelope * chest * mouth);
 }
 
