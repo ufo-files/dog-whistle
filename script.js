@@ -22,7 +22,7 @@ const SPHERE_SAMPLE_SMOOTHING = .017;
 const SPHERE_TEMPORAL_BLEND = .3;
 const SPHERE_LED_SIZE = .026;
 const SPHERE_LED_COUNT = 32000;
-const SPHERE_UPDATE_INTERVAL_MS = 33;
+const SPHERE_UPDATE_INTERVAL_MS = 16;
 const SPHERE_LAYER_GAIN = {
   carrier: 1,
   pad: 1.08,
@@ -59,24 +59,6 @@ const DISPLAY_LAYERS = [
   { id: "breath", label: "air", alpha: loudnessAlpha(.008), width: loudnessStroke(.008) },
 ];
 
-const SIGNAL = {
-  binauralBeatHz: 7.83,
-  baseHz: 100,
-  harmonicHz: 528,
-  pingHz: 17000,
-  pingEverySeconds: 3,
-  chirpHz: 2500,
-  chirpEverySeconds: 10,
-  padHz: 432,
-  pulseHz: .42,
-  carrierGain: .115,
-  harmonicGain: .014,
-  pingGain: .24,
-  chirpGain: .058,
-  padGain: .035,
-  breathGain: .008,
-};
-
 const state = {
   audio: null,
   processor: null,
@@ -106,96 +88,28 @@ const sphereState = {
   lastGeometryUpdate: 0,
 };
 
-function createAudio() {
+async function createAudio() {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   if (!AudioContext) throw new Error("Web Audio is not supported in this browser.");
 
   const audio = new AudioContext();
   const master = audio.createGain();
-  const processor = audio.createScriptProcessor(1024, 0, 2);
+  if (!audio.audioWorklet) throw new Error("AudioWorklet is not supported in this browser.");
+  await audio.audioWorklet.addModule("audio-worklet.js");
+  const processor = new AudioWorkletNode(audio, "dog-whistle-processor", {
+    numberOfInputs: 0,
+    numberOfOutputs: 1,
+    outputChannelCount: [2],
+  });
 
   master.gain.value = 0;
-  processor.onaudioprocess = (event) => {
-    const left = event.outputBuffer.getChannelData(0);
-    const right = event.outputBuffer.getChannelData(1);
-    const sampleRate = event.outputBuffer.sampleRate;
-    const playbackTime = event.playbackTime || audio.currentTime;
-    ensureLiveChannelSize();
-
-    for (let i = 0; i < left.length; i += 1) {
-      if (!state.playing) {
-        left[i] = 0;
-        right[i] = 0;
-        writeLiveFrame(0, 0, null, 0);
-        continue;
-      }
-
-      const t = playbackTime + i / sampleRate - state.audioStartTime;
-      const pulse = state.mode === "pulse" ? pulseEnvelope(t) : 1;
-      const components = sampleStereoComponents(t);
-      const stereo = mixStereoComponents(components, pulse);
-      left[i] = stereo.left;
-      right[i] = stereo.right;
-      writeLiveFrame(stereo.left, stereo.right, components, pulse);
-    }
-  };
+  processor.port.onmessage = (event) => writeWorkletFrameBlock(event.data);
+  processor.port.postMessage({ type: "binaural", value: state.binaural });
 
   processor.connect(master).connect(audio.destination);
   state.audio = audio;
   state.processor = processor;
   state.master = master;
-}
-
-function sampleSignal(t, mode) {
-  const stereo = sampleStereoSignal(t, mode);
-  return (stereo.left + stereo.right) * .5;
-}
-
-function sampleStereoSignal(t, mode) {
-  const gain = mode === "pulse" ? pulseEnvelope(t) : 1;
-  return mixStereoComponents(sampleStereoComponents(t), gain);
-}
-
-function sampleStereoComponents(t) {
-  if (!state.binaural) {
-    const center = sampleComponents(t, "center");
-    return { left: center, right: center };
-  }
-
-  return {
-    left: sampleComponents(t, "left"),
-    right: sampleComponents(t, "right"),
-  };
-}
-
-function mixStereoComponents(components, gain) {
-  return {
-    left: mixComponents(components.left, gain),
-    right: mixComponents(components.right, gain),
-  };
-}
-
-function sampleComponents(t, ear) {
-  return {
-    carrier: sampleComponent("carrier", t, ear),
-    harmonic: sampleComponent("harmonic", t, ear),
-    ping: sampleComponent("ping", t),
-    chirp: sampleComponent("chirp", t),
-    pad: sampleComponent("pad", t, ear),
-    breath: sampleComponent("breath", t, ear),
-  };
-}
-
-function mixComponents(components, gain) {
-  const sum =
-    components.carrier +
-    components.harmonic +
-    components.ping +
-    components.chirp +
-    components.pad +
-    components.breath;
-
-  return clamp(sum * gain, -1, 1);
 }
 
 function createLiveChannels(length) {
@@ -222,17 +136,28 @@ function ensureLiveChannelSize() {
   state.liveLayers = createLiveLayers(VISUAL_HISTORY_LENGTH);
 }
 
-function writeLiveFrame(left, right, components, pulse) {
-  const index = state.liveWriteIndex;
-  state.liveChannels.left[index] = left;
-  state.liveChannels.right[index] = right;
+function writeWorkletFrameBlock(block) {
+  if (!block || !block.length) return;
+  ensureLiveChannelSize();
 
-  DISPLAY_LAYERS.forEach((layer) => {
-    state.liveLayers[layer.id].left[index] = components ? components.left[layer.id] * pulse : 0;
-    state.liveLayers[layer.id].right[index] = components ? components.right[layer.id] * pulse : 0;
-  });
-
-  state.liveWriteIndex = (index + 1) % VISUAL_HISTORY_LENGTH;
+  for (let offset = 0; offset < block.length; offset += 14) {
+    const index = state.liveWriteIndex;
+    state.liveChannels.left[index] = block[offset];
+    state.liveChannels.right[index] = block[offset + 1];
+    state.liveLayers.carrier.left[index] = block[offset + 2];
+    state.liveLayers.carrier.right[index] = block[offset + 3];
+    state.liveLayers.harmonic.left[index] = block[offset + 4];
+    state.liveLayers.harmonic.right[index] = block[offset + 5];
+    state.liveLayers.ping.left[index] = block[offset + 6];
+    state.liveLayers.ping.right[index] = block[offset + 7];
+    state.liveLayers.chirp.left[index] = block[offset + 8];
+    state.liveLayers.chirp.right[index] = block[offset + 9];
+    state.liveLayers.pad.left[index] = block[offset + 10];
+    state.liveLayers.pad.right[index] = block[offset + 11];
+    state.liveLayers.breath.left[index] = block[offset + 12];
+    state.liveLayers.breath.right[index] = block[offset + 13];
+    state.liveWriteIndex = (index + 1) % VISUAL_HISTORY_LENGTH;
+  }
 }
 
 function readLiveSamples(samples) {
@@ -243,108 +168,9 @@ function readLiveSamples(samples) {
   return ordered;
 }
 
-function sampleComponent(component, t, ear = "center") {
-  if (component === "carrier") {
-    return sine(binauralCarrierFrequency(ear), t) * SIGNAL.carrierGain;
-  }
-
-  if (component === "harmonic") {
-    return sine(SIGNAL.harmonicHz, t) * SIGNAL.harmonicGain;
-  }
-
-  if (component === "ping") {
-    return sine(SIGNAL.pingHz, t) * pingEnvelope(t) * SIGNAL.pingGain;
-  }
-
-  if (component === "chirp") {
-    const envelope = chirpEnvelope(t);
-    if (!envelope) return 0;
-    const phase = positiveModulo(t, SIGNAL.chirpEverySeconds);
-    const eventTime = phase - .16;
-    return Math.sin(chirpPhase(eventTime)) * envelope * SIGNAL.chirpGain;
-  }
-
-  if (component === "pad") {
-    return sine(SIGNAL.padHz, t) * SIGNAL.padGain;
-  }
-
-  if (component === "breath") {
-    return breathLayer(t, ear) * SIGNAL.breathGain;
-  }
-
-  return 0;
-}
-
-function binauralCarrierFrequency(ear) {
-  if (ear === "left") return SIGNAL.baseHz - SIGNAL.binauralBeatHz / 2;
-  if (ear === "right") return SIGNAL.baseHz + SIGNAL.binauralBeatHz / 2;
-  return SIGNAL.baseHz;
-}
-
-function chirpEnvelope(t) {
-  const phase = positiveModulo(t, SIGNAL.chirpEverySeconds);
-  if (phase < .22 || phase > .62) return 0;
-  const eventTime = phase - .22;
-  return Math.sin(Math.PI * eventTime / .4);
-}
-
-function pingEnvelope(t) {
-  const phase = positiveModulo(t, SIGNAL.pingEverySeconds);
-  if (phase > .14) return 0;
-  return Math.sin(Math.PI * phase / .14);
-}
-
-function pulseEnvelope(t) {
-  const wave = unipolarSine(SIGNAL.pulseHz, t);
-  const smoothed = wave * wave * (3 - 2 * wave);
-  return .18 + .82 * smoothed;
-}
-
-function breathLayer(t, ear = "center") {
-  const offset = ear === "right" ? .037 : 0;
-  const noiseTime = t + offset;
-  const cycle = positiveModulo(t + .35, 5.6) / 5.6;
-  const inhale = cycle < .38 ? smoothstep(cycle / .38) : 1 - smoothstep((cycle - .38) / .62);
-  const exhale = cycle < .2 ? smoothstep(cycle / .2) : 1 - smoothstep((cycle - .2) / .8);
-  const envelope = .06 + inhale * .14 + exhale * .8;
-  const chest = .9 + .06 * sine(.17, t + .2) + .04 * sine(.29, t + 1.3);
-  const air =
-    interpolatedNoise(noiseTime * 420) * .16 +
-    interpolatedNoise(noiseTime * 1100) * .22 +
-    interpolatedNoise(noiseTime * 2600) * .26 +
-    hashNoise(Math.floor(noiseTime * 6200)) * .2 +
-    hashNoise(Math.floor(noiseTime * 11800)) * .16;
-  const mouth = .78 + .14 * unipolarSine(.11, t + 1.6) + .08 * unipolarSine(.23, t);
-  return air * envelope * chest * mouth;
-}
-
-function sine(frequency, t) {
-  return Math.sin(TWO_PI * frequency * t);
-}
-
-function chirpPhase(eventTime) {
-  const duration = .4;
-  const startHz = SIGNAL.chirpHz - 420;
-  const sweepHz = 840;
-  const clampedTime = Math.min(duration, Math.max(0, eventTime));
-  const cycles = startHz * clampedTime + (sweepHz / (2 * duration)) * clampedTime * clampedTime;
-  return TWO_PI * cycles;
-}
-
-function unipolarSine(frequency, t) {
-  return .5 + .5 * sine(frequency, t);
-}
-
 function smoothstep(value) {
   const x = clamp(value, 0, 1);
   return x * x * (3 - 2 * x);
-}
-
-function interpolatedNoise(x) {
-  const i = Math.floor(x);
-  const fraction = x - i;
-  const eased = fraction * fraction * (3 - 2 * fraction);
-  return lerp(hashNoise(i), hashNoise(i + 1), eased);
 }
 
 function hashNoise(index) {
@@ -368,7 +194,7 @@ function updateMasterGain() {
 
 async function startPlayback(mode) {
   try {
-    if (!state.audio) createAudio();
+    if (!state.audio) await createAudio();
     if (state.audio.state === "suspended") await state.audio.resume();
   } catch (error) {
     statusEl.textContent = error.message || "Audio unavailable";
@@ -381,6 +207,7 @@ async function startPlayback(mode) {
   state.audioStartTime = state.audio.currentTime;
   statusEl.textContent = mode === "pulse" ? "Active / pulsed audio" : "Active / straight audio";
   setButtonState();
+  state.processor.port.postMessage({ type: "start", mode });
   updateMasterGain();
 }
 
@@ -392,6 +219,7 @@ function stopPlayback() {
   if (state.master) {
     state.master.gain.setTargetAtTime(0, state.audio.currentTime, .025);
   }
+  if (state.processor) state.processor.port.postMessage({ type: "stop" });
 }
 
 function togglePlay() {
@@ -412,6 +240,7 @@ function togglePulse() {
 
 function updateBinaural() {
   state.binaural = binauralInput.checked;
+  if (state.processor) state.processor.port.postMessage({ type: "binaural", value: state.binaural });
   resetSphereDisplacementMemory();
   setButtonState();
 }
@@ -669,7 +498,7 @@ function updateSphereLedLayer({ ledLayer, metrics, active }) {
   const isBreath = ledLayer.layer.id === "breath";
   const baseRadius = isBreath ? SPHERE_BREATH_CORE_RADIUS : SPHERE_RADIUS;
   const targetCoreSwell = isBreath ? smoothstep(clamp(layerEnergy / .0028, 0, 1)) * .29 * active : 0;
-  const coreSwell = isBreath ? lerp(ledLayer.swell || 0, targetCoreSwell, .08) : 0;
+  const coreSwell = isBreath ? lerp(ledLayer.swell || 0, targetCoreSwell, .035) : 0;
   const waveformScale = isBreath ? .18 : 1;
   const energyScale = isBreath ? .18 : 1;
   const eventComponent = isBreath ? 0 : eventLift;
