@@ -3,6 +3,7 @@ const ctx = canvas.getContext("2d");
 const sphereCanvas = document.getElementById("sphere");
 const playButton = document.getElementById("play");
 const pulseButton = document.getElementById("pulse");
+const appSwitcher = document.getElementById("app-switcher");
 const binauralInput = document.getElementById("binaural");
 const visualizationInput = document.getElementById("visualization");
 const volumeInput = document.getElementById("volume");
@@ -910,6 +911,11 @@ function clamp(value, min, max) {
 
 playButton.addEventListener("click", togglePlay);
 pulseButton.addEventListener("click", togglePulse);
+appSwitcher.addEventListener("change", () => {
+  if (appSwitcher.value && appSwitcher.value !== window.location.href) {
+    window.location.href = appSwitcher.value;
+  }
+});
 binauralInput.addEventListener("change", updateBinaural);
 visualizationInput.addEventListener("change", updateVisualization);
 volumeInput.addEventListener("input", () => {

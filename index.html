@@ -13,7 +13,16 @@
 
     <div class="topbar">
       <section class="brand" aria-label="Signal status">
-        <h1 id="app-title">Dog Whistle</h1>
+        <div class="owner-label">UFO Files</div>
+        <h1 id="app-title">
+          <span class="app-switcher">
+            <span class="app-switcher-text">Dog Whistle</span>
+            <select id="app-switcher" aria-label="Application">
+              <option value="https://ufo-files.github.io/dog-whistle/" selected>Dog Whistle</option>
+              <option value="https://ufo-files.github.io/relationship-graph/">Relationship Graph</option>
+            </select>
+          </span>
+        </h1>
         <div class="meta" id="status" role="status" aria-live="polite">Idle / output muted</div>
       </section>
 
