@@ -61,7 +61,9 @@ class DogWhistleProcessor extends AudioWorkletProcessor {
       const carrierLeft = sine(leftCarrierHz, t) * SIGNAL.carrierGain;
       const carrierRight = sine(rightCarrierHz, t) * SIGNAL.carrierGain;
       const harmonic = sine(SIGNAL.harmonicHz, t) * SIGNAL.harmonicGain;
-      const ping = sine(SIGNAL.pingHz, t) * pingEnvelope(t) * SIGNAL.pingGain;
+      const pingEnvelopeValue = pingEnvelope(t);
+      const ping = sine(SIGNAL.pingHz, t) * pingEnvelopeValue * SIGNAL.pingGain;
+      const pingVisual = pingEnvelopeValue * SIGNAL.pingGain * 2.4;
       const chirp = sampleChirp(t);
       const pad = sine(SIGNAL.padHz, t) * SIGNAL.padGain;
       const breathLeft = breathLayer(t, this.binaural ? "left" : "center") * SIGNAL.breathGain;
@@ -77,8 +79,8 @@ class DogWhistleProcessor extends AudioWorkletProcessor {
       visual[offset + 3] = carrierRight * pulse;
       visual[offset + 4] = harmonic * pulse;
       visual[offset + 5] = harmonic * pulse;
-      visual[offset + 6] = ping * pulse;
-      visual[offset + 7] = ping * pulse;
+      visual[offset + 6] = pingVisual * pulse;
+      visual[offset + 7] = pingVisual * pulse;
       visual[offset + 8] = chirp * pulse;
       visual[offset + 9] = chirp * pulse;
       visual[offset + 10] = pad * pulse;

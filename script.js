@@ -54,7 +54,7 @@ const DISPLAY_LAYERS = [
   { id: "carrier", label: "100", alpha: loudnessAlpha(.115), width: loudnessStroke(.115) },
   { id: "pad", label: "432", alpha: loudnessAlpha(.035), width: loudnessStroke(.035) },
   { id: "harmonic", label: "528", alpha: loudnessAlpha(.014), width: loudnessStroke(.014) },
-  { id: "ping", label: "17k", alpha: loudnessAlpha(.012), width: loudnessStroke(.012) },
+  { id: "ping", label: "17k", alpha: loudnessAlpha(.029), width: loudnessStroke(.029) },
   { id: "chirp", label: "2.5k", alpha: loudnessAlpha(.058), width: loudnessStroke(.058) },
   { id: "breath", label: "air", alpha: loudnessAlpha(.055), width: loudnessStroke(.055) },
 ];
