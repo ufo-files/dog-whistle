@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dog Whistle</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main aria-labelledby="app-title">
+    <canvas id="waveform" aria-label="Layered signal waveform"></canvas>
+    <canvas id="sphere" aria-label="3D signal sphere"></canvas>
+
+    <div class="topbar">
+      <section class="brand" aria-label="Signal status">
+        <h1 id="app-title">Dog Whistle</h1>
+        <div class="meta" id="status" role="status" aria-live="polite">Idle / output muted</div>
+      </section>
+
+      <form class="controls" id="controls" aria-label="Audio controls">
+        <button id="play" type="button">Play</button>
+        <button id="pulse" type="button" aria-pressed="false">Pulse</button>
+        <label class="field view-field" for="visualization">
+          <span>View</span>
+          <select id="visualization">
+            <option value="sphere">Sphere</option>
+            <option value="circle">Circle</option>
+            <option value="waveform">Waveform</option>
+          </select>
+        </label>
+        <label class="toggle" for="binaural">
+          <span>Binaural mode</span>
+          <input id="binaural" type="checkbox" checked>
+          <i aria-hidden="true"></i>
+        </label>
+        <label class="field" for="volume">
+          <span>Volume</span>
+          <input id="volume" type="range" min="0" max="0.6" value="0.12" step="0.001">
+        </label>
+      </form>
+    </div>
+
+    <section class="readout" aria-label="Signal layers">
+      <div><span>100 Hz</span><b>7.83 Hz L/R beat</b></div>
+      <div><span>528 Hz</span><b>Harmonic</b></div>
+      <div><span>17 kHz</span><b>3 sec ping</b></div>
+      <div><span>2.5 kHz</span><b>10 sec chirp</b></div>
+      <div><span>432 Hz</span><b>Pad</b></div>
+      <div><span>Noise</span><b>Breath</b></div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
