@@ -382,12 +382,13 @@ function createSphereLedLayers(THREE, pointTexture) {
     remainder = Math.max(0, remainder - 1);
     const visualGain = SPHERE_LAYER_GAIN[layer.id] || 1;
     const coreScale = layer.id === "breath" ? .72 : 1;
+    const opacityScale = layer.id === "ping" ? .38 : layer.id === "breath" ? 1.5 : 1;
     const material = new THREE.PointsMaterial({
       color: 0x111111,
       size: SPHERE_LED_SIZE * (.5 + layer.width * .16) * Math.sqrt(visualGain) * coreScale,
       map: pointTexture,
       transparent: true,
-      opacity: clamp(layer.alpha * (.72 + visualGain * .18) * (layer.id === "breath" ? 1.5 : 1), .16, .82),
+      opacity: clamp(layer.alpha * (.72 + visualGain * .18) * opacityScale, .08, .82),
       alphaTest: .03,
       depthWrite: false,
       sizeAttenuation: true,
