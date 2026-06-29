@@ -15,7 +15,7 @@ const SIGNAL = {
   chirpGain: .058,
   padGain: .035,
   breathGain: .068,
-  breathCycleSeconds: 8.4,
+  breathCycleSeconds: 16,
 };
 
 class DogWhistleProcessor extends AudioWorkletProcessor {
@@ -154,7 +154,10 @@ function breathLayer(t, ear = "center") {
 
 function breathPhase(t) {
   const cycle = positiveModulo(t + .35, SIGNAL.breathCycleSeconds) / SIGNAL.breathCycleSeconds;
-  return cycle < .5 ? smoothstep(cycle / .5) : 1 - smoothstep((cycle - .5) / .5);
+  if (cycle < .25) return smoothstep(cycle / .25);
+  if (cycle < .5) return 1;
+  if (cycle < .75) return 1 - smoothstep((cycle - .5) / .25);
+  return 0;
 }
 
 function sine(frequency, t) {
