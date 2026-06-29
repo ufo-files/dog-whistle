@@ -15,7 +15,7 @@ const SIGNAL = {
   chirpGain: .058,
   padGain: .035,
   breathGain: .068,
-  breathCycleSeconds: 16,
+  breathCycleSeconds: 20,
 };
 
 class DogWhistleProcessor extends AudioWorkletProcessor {
