@@ -96,9 +96,17 @@ h1 {
 }
 
 .owner-label {
+  display: inline-block;
   color: var(--muted);
   font-size: 12px;
   text-transform: uppercase;
+  text-decoration: none;
+}
+
+.owner-label:hover,
+.owner-label:focus-visible {
+  color: var(--muted);
+  text-decoration: underline;
 }
 
 .app-switcher {
