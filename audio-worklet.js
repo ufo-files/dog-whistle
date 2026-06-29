@@ -14,7 +14,7 @@ const SIGNAL = {
   pingGain: .012,
   chirpGain: .058,
   padGain: .035,
-  breathGain: .008,
+  breathGain: .018,
 };
 
 class DogWhistleProcessor extends AudioWorkletProcessor {
@@ -142,7 +142,9 @@ function breathLayer(t, ear = "center") {
     interpolatedNoise(noiseTime * 95) * .22 +
     interpolatedNoise(noiseTime * 190) * .16 +
     interpolatedNoise(noiseTime * 360) * .1 +
-    interpolatedNoise(noiseTime * 720) * .045;
+    interpolatedNoise(noiseTime * 720) * .06 +
+    interpolatedNoise(noiseTime * 1150) * .032 +
+    interpolatedNoise(noiseTime * 1800) * .018;
   const mouth = .78 + .14 * unipolarSine(.11, t + 1.6) + .08 * unipolarSine(.23, t);
   return softClip(air * envelope * chest * mouth);
 }

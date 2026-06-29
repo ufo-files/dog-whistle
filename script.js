@@ -56,7 +56,7 @@ const DISPLAY_LAYERS = [
   { id: "harmonic", label: "528", alpha: loudnessAlpha(.014), width: loudnessStroke(.014) },
   { id: "ping", label: "17k", alpha: loudnessAlpha(.012), width: loudnessStroke(.012) },
   { id: "chirp", label: "2.5k", alpha: loudnessAlpha(.058), width: loudnessStroke(.058) },
-  { id: "breath", label: "air", alpha: loudnessAlpha(.008), width: loudnessStroke(.008) },
+  { id: "breath", label: "air", alpha: loudnessAlpha(.018), width: loudnessStroke(.018) },
 ];
 
 const state = {
