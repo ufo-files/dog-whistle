@@ -8,6 +8,20 @@ Live site: https://ufo-files.github.io/dog-whistle/
 
 Repository: https://github.com/ufo-files/dog-whistle
 
+## Screenshots
+
+### Sphere
+
+![Dog Whistle sphere view while playing](screenshots/dog-whistle-sphere.png)
+
+### Circle
+
+![Dog Whistle circle view while playing](screenshots/dog-whistle-circle.png)
+
+### Waveform
+
+![Dog Whistle waveform view while playing](screenshots/dog-whistle-waveform.png)
+
 ## What It Does
 
 The app generates a layered stereo signal in the browser and visualizes the same generated buffers in real time. The signal includes:
@@ -65,7 +79,9 @@ The app is fully static. All runtime code is committed in this repository.
 | `index.html` | Application shell and controls |
 | `styles.css` | Minimal monochrome interface styling |
 | `script.js` | Web Audio synthesis, playback controls, and visualizers |
+| `scripts/capture_screenshots.js` | Captures README screenshots for Sphere, Circle, and Waveform while playing |
 | `.github/workflows/pages.yml` | GitHub Pages deployment workflow |
+| `.github/workflows/screenshots.yml` | Refreshes committed screenshots after app changes |
 
 ## Reproducibility
 

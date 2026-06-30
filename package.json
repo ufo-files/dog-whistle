@@ -1,0 +1,11 @@
+{
+  "name": "dog-whistle",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "screenshots": "node scripts/capture_screenshots.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.53.0"
+  }
+}
