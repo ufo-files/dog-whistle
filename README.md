@@ -99,6 +99,10 @@ Sphere mode lazy-loads Three.js from jsDelivr. Circle and Waveform do not requir
 
 No OpenAI API key or external service is required to generate the audio.
 
+## Contribution Guardrails
+
+Anyone can fork the repository and open a pull request. Merging to `main` requires review from the repository owner declared in `.github/CODEOWNERS`; branch protection enforces that review before changes can land.
+
 ## Limits
 
 This is an experimental signal player and visualizer, not evidence that any tone summons, detects, or communicates with UAP. The visualizations are data-derived from the generated buffers, but they are not raw oscilloscope plots. Sphere mode applies smoothing, projection sampling, per-layer visual gain, and temporal easing so the 3D form remains readable.
