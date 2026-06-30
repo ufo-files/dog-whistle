@@ -39,7 +39,7 @@
         </label>
         <label class="toggle" for="binaural">
           <span>Binaural mode</span>
-          <input id="binaural" type="checkbox" checked>
+          <input id="binaural" type="checkbox">
           <i aria-hidden="true"></i>
         </label>
         <label class="field" for="volume">
@@ -50,12 +50,72 @@
     </div>
 
     <section class="readout" aria-label="Signal layers">
-      <div><span>100 Hz</span><b>7.83 Hz L/R beat</b></div>
-      <div><span>528 Hz</span><b>Harmonic</b></div>
-      <div><span>17 kHz</span><b>3 sec ping</b></div>
-      <div><span>2.5 kHz</span><b>10 sec chirp</b></div>
-      <div><span>432 Hz</span><b>Pad</b></div>
-      <div><span>Noise</span><b>Breath</b></div>
+      <div class="layer-control" data-layer-control="carrier">
+        <div class="layer-frequency">
+          <input id="frequency-carrier" class="layer-frequency-input" type="number" data-layer="carrier" min="20" max="1000" value="100" step="0.01" aria-label="Carrier frequency">
+          <em>Hz</em>
+        </div>
+        <b>7.83 Hz L/R beat</b>
+        <label class="layer-switch" aria-label="Toggle 100 Hz carrier">
+          <input class="layer-toggle" type="checkbox" data-layer="carrier" checked>
+          <i aria-hidden="true"></i>
+        </label>
+      </div>
+      <div class="layer-control" data-layer-control="harmonic">
+        <div class="layer-frequency">
+          <input id="frequency-harmonic" class="layer-frequency-input" type="number" data-layer="harmonic" min="20" max="20000" value="528" step="0.01" aria-label="Harmonic frequency">
+          <em>Hz</em>
+        </div>
+        <b>Harmonic</b>
+        <label class="layer-switch" aria-label="Toggle 528 Hz harmonic">
+          <input class="layer-toggle" type="checkbox" data-layer="harmonic" checked>
+          <i aria-hidden="true"></i>
+        </label>
+      </div>
+      <div class="layer-control" data-layer-control="ping">
+        <div class="layer-frequency">
+          <input id="frequency-ping" class="layer-frequency-input" type="number" data-layer="ping" min="1000" max="20000" value="17000" step="1" aria-label="Ping frequency">
+          <em>Hz</em>
+        </div>
+        <b>3 sec ping</b>
+        <label class="layer-switch" aria-label="Toggle 17 kHz ping">
+          <input class="layer-toggle" type="checkbox" data-layer="ping" checked>
+          <i aria-hidden="true"></i>
+        </label>
+      </div>
+      <div class="layer-control" data-layer-control="chirp">
+        <div class="layer-frequency">
+          <input id="frequency-chirp" class="layer-frequency-input" type="number" data-layer="chirp" min="100" max="12000" value="2500" step="1" aria-label="Chirp frequency">
+          <em>Hz</em>
+        </div>
+        <b>10 sec chirp</b>
+        <label class="layer-switch" aria-label="Toggle 2.5 kHz chirp">
+          <input class="layer-toggle" type="checkbox" data-layer="chirp" checked>
+          <i aria-hidden="true"></i>
+        </label>
+      </div>
+      <div class="layer-control" data-layer-control="pad">
+        <div class="layer-frequency">
+          <input id="frequency-pad" class="layer-frequency-input" type="number" data-layer="pad" min="20" max="20000" value="432" step="0.01" aria-label="Pad frequency">
+          <em>Hz</em>
+        </div>
+        <b>Pad</b>
+        <label class="layer-switch" aria-label="Toggle 432 Hz pad">
+          <input class="layer-toggle" type="checkbox" data-layer="pad" checked>
+          <i aria-hidden="true"></i>
+        </label>
+      </div>
+      <div class="layer-control" data-layer-control="breath">
+        <div class="layer-frequency">
+          <input id="frequency-breath" class="layer-frequency-input" type="number" data-layer="breath" min="4" max="40" value="16" step="0.1" aria-label="Breath cycle length">
+          <em>sec</em>
+        </div>
+        <b>Breath cycle</b>
+        <label class="layer-switch" aria-label="Toggle breath layer">
+          <input class="layer-toggle" type="checkbox" data-layer="breath" checked>
+          <i aria-hidden="true"></i>
+        </label>
+      </div>
     </section>
   </main>
 

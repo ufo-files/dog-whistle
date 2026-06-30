@@ -8,6 +8,8 @@ const binauralInput = document.getElementById("binaural");
 const visualizationInput = document.getElementById("visualization");
 const volumeInput = document.getElementById("volume");
 const statusEl = document.getElementById("status");
+const layerToggleInputs = Array.from(document.querySelectorAll(".layer-toggle"));
+const layerFrequencyInputs = Array.from(document.querySelectorAll(".layer-frequency-input"));
 
 const TWO_PI = Math.PI * 2;
 const THREE_CDN_URL = "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js";
@@ -42,6 +44,14 @@ const SPHERE_LAYER_ENERGY_GAIN = {
   breath: .9,
 };
 const SPHERE_BREATH_CORE_RADIUS = .34;
+const LAYER_DEFAULTS = {
+  carrier: { enabled: true, frequency: 100, min: 20, max: 1000, step: .01, unit: "Hz" },
+  pad: { enabled: true, frequency: 432, min: 20, max: 20000, step: .01, unit: "Hz" },
+  harmonic: { enabled: true, frequency: 528, min: 20, max: 20000, step: .01, unit: "Hz" },
+  ping: { enabled: true, frequency: 17000, min: 1000, max: 20000, step: 1, unit: "Hz" },
+  chirp: { enabled: true, frequency: 2500, min: 100, max: 12000, step: 1, unit: "Hz" },
+  breath: { enabled: true, frequency: 16, min: 4, max: 40, step: .1, unit: "sec" },
+};
 const SPHERE_PHASE_AXES = [
   { x: .742, y: .284, z: .607, weight: .34, offset: .07 },
   { x: -.386, y: .813, z: .436, weight: .31, offset: .29 },
@@ -70,6 +80,7 @@ const state = {
   binaural: binauralInput.checked,
   visualization: visualizationInput.value,
   volume: Number(volumeInput.value),
+  layers: createLayerSettings(),
   startedAt: performance.now() / 1000,
   audioStartTime: 0,
   liveWriteIndex: 0,
@@ -108,6 +119,7 @@ async function createAudio() {
   master.gain.value = 0;
   processor.port.onmessage = (event) => writeWorkletFrameBlock(event.data);
   processor.port.postMessage({ type: "binaural", value: state.binaural });
+  sendLayerSettings(processor);
 
   processor.connect(master).connect(audio.destination);
   state.audio = audio;
@@ -129,6 +141,16 @@ function createLiveLayers(length) {
       right: new Float32Array(length),
     };
     return layers;
+  }, {});
+}
+
+function createLayerSettings() {
+  return Object.entries(LAYER_DEFAULTS).reduce((settings, [id, defaults]) => {
+    settings[id] = {
+      enabled: defaults.enabled,
+      frequency: defaults.frequency,
+    };
+    return settings;
   }, {});
 }
 
@@ -192,6 +214,33 @@ function setButtonState() {
   binauralInput.checked = state.binaural;
 }
 
+function setLayerControlState() {
+  layerToggleInputs.forEach((input) => {
+    const layerId = input.dataset.layer;
+    const setting = state.layers[layerId];
+    if (!setting) return;
+    input.checked = setting.enabled;
+    const control = document.querySelector('[data-layer-control="' + layerId + '"]');
+    if (control) control.classList.toggle("disabled", !setting.enabled);
+  });
+
+  layerFrequencyInputs.forEach((input) => {
+    const layerId = input.dataset.layer;
+    const defaults = LAYER_DEFAULTS[layerId];
+    const setting = state.layers[layerId];
+    if (!defaults || !setting) return;
+    input.value = formatInputNumber(setting.frequency, defaults.step);
+  });
+}
+
+function sendLayerSettings(processor = state.processor) {
+  if (!processor) return;
+  processor.port.postMessage({
+    type: "layers",
+    layers: state.layers,
+  });
+}
+
 function updateMasterGain() {
   if (!state.master || !state.audio) return;
   state.master.gain.setTargetAtTime(state.volume, state.audio.currentTime, .03);
@@ -248,6 +297,53 @@ function updateBinaural() {
   if (state.processor) state.processor.port.postMessage({ type: "binaural", value: state.binaural });
   resetSphereDisplacementMemory();
   setButtonState();
+}
+
+function updateLayerFromControl(event) {
+  const input = event.currentTarget;
+  const layerId = input.dataset.layer;
+  const defaults = LAYER_DEFAULTS[layerId];
+  const setting = state.layers[layerId];
+  if (!defaults || !setting) return;
+
+  if (input.classList.contains("layer-toggle")) {
+    setting.enabled = input.checked;
+  } else {
+    const value = Number(input.value);
+    if (!Number.isFinite(value)) return;
+    setting.frequency = clamp(value, defaults.min, defaults.max);
+    input.value = formatInputNumber(setting.frequency, defaults.step);
+  }
+
+  clearLayerSamples(layerId);
+  sendLayerSettings();
+  resetSphereDisplacementMemory();
+  setLayerControlState();
+}
+
+function clearLayerSamples(layerId) {
+  const layer = state.liveLayers[layerId];
+  if (!layer) return;
+  layer.left.fill(0);
+  layer.right.fill(0);
+  if (layerId === "breath") state.liveBreathEnvelope.fill(0);
+}
+
+function layerEnabled(layerId) {
+  return state.layers[layerId] ? state.layers[layerId].enabled : true;
+}
+
+function activeDisplayLayers() {
+  return DISPLAY_LAYERS.filter((layer) => layerEnabled(layer.id));
+}
+
+function formatInputNumber(value, step) {
+  if (step >= 1) return String(Math.round(value));
+  return formatNumber(value);
+}
+
+function formatNumber(value) {
+  return Number(value.toFixed(2)).toString();
 }
 
 function updateVisualization() {
@@ -494,6 +590,9 @@ function updateSphereLedLayers({ metrics, active }) {
 }
 
 function updateSphereLedLayer({ ledLayer, metrics, active }) {
+  ledLayer.points.visible = layerEnabled(ledLayer.layer.id);
+  if (!ledLayer.points.visible) return;
+
   const left = zoomSamples(visualLayerSamples(ledLayer.layer, "left"), .48);
   const right = zoomSamples(visualLayerSamples(ledLayer.layer, "right"), .48);
   const layerEnergy = rms(left, right);
@@ -600,7 +699,7 @@ function drawStereoWaveform({ width, height, active }) {
     const centerY = height * channel.y;
     drawCenterLine(centerY, width);
     drawChannelLabel(channel.label, centerY);
-    DISPLAY_LAYERS.forEach((layer) => {
+    activeDisplayLayers().forEach((layer) => {
       drawLiveLayerWaveform({ centerY, amplitude, width, channel, layer });
     });
   });
@@ -646,7 +745,7 @@ function drawStereoCircle({ width, height, active }) {
     return;
   }
 
-  DISPLAY_LAYERS.forEach((layer) => {
+  activeDisplayLayers().forEach((layer) => {
     const leftSamples = zoomSamples(visualLayerSamples(layer, "left"), .48);
     const rightSamples = zoomSamples(visualLayerSamples(layer, "right"), .48);
     const leftPoints = buildCirclePoints({
@@ -679,7 +778,7 @@ function sphereProjectedRadius(height) {
 }
 
 function drawMonoCircleLayers({ centerX, centerY, radius, active }) {
-  DISPLAY_LAYERS.forEach((layer) => {
+  activeDisplayLayers().forEach((layer) => {
     const samples = zoomSamples(visualLayerSamples(layer, "left"), .48);
     const points = buildCirclePoints({
       samples,
@@ -923,5 +1022,14 @@ volumeInput.addEventListener("input", () => {
   updateMasterGain();
 });
 window.addEventListener("resize", resizeCanvas);
+layerToggleInputs.forEach((input) => input.addEventListener("change", updateLayerFromControl));
+layerFrequencyInputs.forEach((input) => {
+  input.addEventListener("change", updateLayerFromControl);
+  input.addEventListener("focus", () => input.select());
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") input.blur();
+  });
+});
 
+setLayerControlState();
 draw();

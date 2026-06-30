@@ -17,13 +17,22 @@ const SIGNAL = {
   breathGain: .068,
   breathCycleSeconds: 16,
 };
+const LAYER_DEFAULTS = {
+  carrier: { enabled: true, frequency: SIGNAL.baseHz },
+  harmonic: { enabled: true, frequency: SIGNAL.harmonicHz },
+  ping: { enabled: true, frequency: SIGNAL.pingHz },
+  chirp: { enabled: true, frequency: SIGNAL.chirpHz },
+  pad: { enabled: true, frequency: SIGNAL.padHz },
+  breath: { enabled: true, frequency: SIGNAL.breathCycleSeconds },
+};
 
 class DogWhistleProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.playing = false;
     this.mode = "idle";
-    this.binaural = true;
+    this.binaural = false;
+    this.layers = createLayerSettings();
     this.startedAt = currentTime;
     this.port.onmessage = (event) => {
       const message = event.data || {};
@@ -36,6 +45,8 @@ class DogWhistleProcessor extends AudioWorkletProcessor {
         this.mode = "idle";
       } else if (message.type === "binaural") {
         this.binaural = Boolean(message.value);
+      } else if (message.type === "layers") {
+        this.layers = normalizeLayerSettings(message.layers);
       }
     };
   }
@@ -44,8 +55,9 @@ class DogWhistleProcessor extends AudioWorkletProcessor {
     const output = outputs[0];
     const left = output[0];
     const right = output[1] || left;
-    const leftCarrierHz = this.binaural ? SIGNAL.baseHz - SIGNAL.binauralBeatHz / 2 : SIGNAL.baseHz;
-    const rightCarrierHz = this.binaural ? SIGNAL.baseHz + SIGNAL.binauralBeatHz / 2 : SIGNAL.baseHz;
+    const carrierHz = this.layers.carrier.frequency;
+    const leftCarrierHz = this.binaural ? carrierHz - SIGNAL.binauralBeatHz / 2 : carrierHz;
+    const rightCarrierHz = this.binaural ? carrierHz + SIGNAL.binauralBeatHz / 2 : carrierHz;
     const visual = new Float32Array(left.length * 15);
 
     for (let i = 0; i < left.length; i += 1) {
@@ -59,17 +71,17 @@ class DogWhistleProcessor extends AudioWorkletProcessor {
 
       const t = currentTime + i / sampleRate - this.startedAt;
       const pulse = this.mode === "pulse" ? pulseEnvelope(t) : 1;
-      const breathMotion = breathPhase(t);
-      const carrierLeft = sine(leftCarrierHz, t) * SIGNAL.carrierGain;
-      const carrierRight = sine(rightCarrierHz, t) * SIGNAL.carrierGain;
-      const harmonic = sine(SIGNAL.harmonicHz, t) * SIGNAL.harmonicGain;
-      const pingEnvelopeValue = pingEnvelope(t);
-      const ping = sine(SIGNAL.pingHz, t) * pingEnvelopeValue * SIGNAL.pingGain;
+      const breathMotion = this.layers.breath.enabled ? breathPhase(t, this.layers.breath.frequency) : 0;
+      const carrierLeft = this.layers.carrier.enabled ? sine(leftCarrierHz, t) * SIGNAL.carrierGain : 0;
+      const carrierRight = this.layers.carrier.enabled ? sine(rightCarrierHz, t) * SIGNAL.carrierGain : 0;
+      const harmonic = this.layers.harmonic.enabled ? sine(this.layers.harmonic.frequency, t) * SIGNAL.harmonicGain : 0;
+      const pingEnvelopeValue = this.layers.ping.enabled ? pingEnvelope(t) : 0;
+      const ping = sine(this.layers.ping.frequency, t) * pingEnvelopeValue * SIGNAL.pingGain;
       const pingVisual = Math.sin(TWO_PI * 9 * t) * pingEnvelopeValue * SIGNAL.pingGain * 3.4;
-      const chirp = sampleChirp(t);
-      const pad = sine(SIGNAL.padHz, t) * SIGNAL.padGain;
-      const breathLeft = breathLayer(t, this.binaural ? "left" : "center") * SIGNAL.breathGain;
-      const breathRight = this.binaural ? breathLayer(t, "right") * SIGNAL.breathGain : breathLeft;
+      const chirp = this.layers.chirp.enabled ? sampleChirp(t, this.layers.chirp.frequency) : 0;
+      const pad = this.layers.pad.enabled ? sine(this.layers.pad.frequency, t) * SIGNAL.padGain : 0;
+      const breathLeft = this.layers.breath.enabled ? breathLayer(t, this.binaural ? "left" : "center", this.layers.breath.frequency) * SIGNAL.breathGain : 0;
+      const breathRight = this.binaural && this.layers.breath.enabled ? breathLayer(t, "right", this.layers.breath.frequency) * SIGNAL.breathGain : breathLeft;
       const leftSample = clamp((carrierLeft + harmonic + ping + chirp + pad + breathLeft) * pulse, -1, 1);
       const rightSample = clamp((carrierRight + harmonic + ping + chirp + pad + breathRight) * pulse, -1, 1);
 
@@ -98,12 +110,28 @@ class DogWhistleProcessor extends AudioWorkletProcessor {
   }
 }
 
-function sampleChirp(t) {
+function createLayerSettings() {
+  return normalizeLayerSettings(LAYER_DEFAULTS);
+}
+
+function normalizeLayerSettings(settings) {
+  return Object.entries(LAYER_DEFAULTS).reduce((layers, [id, defaults]) => {
+    const input = settings && settings[id] ? settings[id] : defaults;
+    const frequency = Number(input.frequency);
+    layers[id] = {
+      enabled: input.enabled !== false,
+      frequency: Number.isFinite(frequency) ? frequency : defaults.frequency,
+    };
+    return layers;
+  }, {});
+}
+
+function sampleChirp(t, chirpHz) {
   const envelope = chirpEnvelope(t);
   if (!envelope) return 0;
   const phase = positiveModulo(t, SIGNAL.chirpEverySeconds);
   const eventTime = phase - .16;
-  return Math.sin(chirpPhase(eventTime)) * envelope * SIGNAL.chirpGain;
+  return Math.sin(chirpPhase(eventTime, chirpHz)) * envelope * SIGNAL.chirpGain;
 }
 
 function chirpEnvelope(t) {
@@ -113,9 +141,9 @@ function chirpEnvelope(t) {
   return Math.sin(Math.PI * eventTime / .4);
 }
 
-function chirpPhase(eventTime) {
+function chirpPhase(eventTime, chirpHz) {
   const duration = .4;
-  const startHz = SIGNAL.chirpHz - 420;
+  const startHz = chirpHz - 420;
   const sweepHz = 840;
   const clampedTime = Math.min(duration, Math.max(0, eventTime));
   const cycles = startHz * clampedTime + (sweepHz / (2 * duration)) * clampedTime * clampedTime;
@@ -134,10 +162,10 @@ function pulseEnvelope(t) {
   return .18 + .82 * smoothed;
 }
 
-function breathLayer(t, ear = "center") {
+function breathLayer(t, ear = "center", cycleSeconds = SIGNAL.breathCycleSeconds) {
   const offset = ear === "right" ? .037 : 0;
   const noiseTime = t + offset;
-  const envelope = .16 + breathPhase(t) * .66;
+  const envelope = .16 + breathPhase(t, cycleSeconds) * .66;
   const chest = .94 + .035 * sine(.17, t + .2) + .025 * sine(.29, t + 1.3);
   const air =
     interpolatedNoise(noiseTime * 85) * .2 +
@@ -152,8 +180,9 @@ function breathLayer(t, ear = "center") {
   return softClip(air * envelope * chest * mouth);
 }
 
-function breathPhase(t) {
-  const cycle = positiveModulo(t + .35, SIGNAL.breathCycleSeconds) / SIGNAL.breathCycleSeconds;
+function breathPhase(t, cycleSeconds = SIGNAL.breathCycleSeconds) {
+  const length = Math.max(4, cycleSeconds);
+  const cycle = positiveModulo(t + .35, length) / length;
   if (cycle < .25) return smoothstep(cycle / .25);
   if (cycle < .5) return 1;
   if (cycle < .75) return 1 - smoothstep((cycle - .5) / .25);

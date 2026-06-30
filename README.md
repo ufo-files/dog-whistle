@@ -28,6 +28,8 @@ Playback and visualization use the same generated output buffers. The frequencie
 - Switch between Sphere, Circle, and Waveform visualizations.
 - Toggle Headphones mode for the binaural carrier split.
 - Switch to Speakers mode for centered mono output.
+- Toggle individual sound layers on and off.
+- Edit the carrier, harmonic, ping, chirp, and pad frequencies; edit the breath cycle length.
 - Adjust output volume.
 
 ## Signal Design
@@ -38,7 +40,7 @@ This keeps the binaural cue scientifically clean: one low carrier creates one in
 
 Headphones are required for the binaural effect. Speakers acoustically mix the left and right channels in air before they reach each ear.
 
-The app defaults to Headphones mode. The Headphones/Speakers toggle switches to Speakers mode, which renders the same centered signal to both output channels.
+The app defaults to Speakers mode. The Binaural mode toggle switches to Headphones mode, which renders the 100 Hz carrier as a left/right binaural pair.
 
 The 17 kHz ping is always part of the main signal. It is not optional or gated behind a monitor mode.
 
