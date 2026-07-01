@@ -165,7 +165,8 @@ function pulseEnvelope(t) {
 function breathLayer(t, ear = "center", cycleSeconds = SIGNAL.breathCycleSeconds) {
   const offset = ear === "right" ? .037 : 0;
   const noiseTime = t + offset;
-  const envelope = .16 + breathPhase(t, cycleSeconds) * .66;
+  const envelope = breathAirEnvelope(t, cycleSeconds);
+  if (envelope <= 0) return 0;
   const chest = .94 + .035 * sine(.17, t + .2) + .025 * sine(.29, t + 1.3);
   const air =
     interpolatedNoise(noiseTime * 85) * .2 +
@@ -178,6 +179,20 @@ function breathLayer(t, ear = "center", cycleSeconds = SIGNAL.breathCycleSeconds
     interpolatedNoise(noiseTime * 3400) * .018;
   const mouth = .82 + .08 * unipolarSine(.37, t + 1.6) + .05 * unipolarSine(.71, t);
   return softClip(air * envelope * chest * mouth);
+}
+
+function breathAirEnvelope(t, cycleSeconds = SIGNAL.breathCycleSeconds) {
+  const length = Math.max(4, cycleSeconds);
+  const side = length / 4;
+  const phase = positiveModulo(t + .35, length);
+  if (phase < side) return breathLobe(phase / side);
+  if (phase < side * 2) return 0;
+  if (phase < side * 3) return breathLobe((phase - side * 2) / side) * .86;
+  return 0;
+}
+
+function breathLobe(value) {
+  return Math.pow(Math.sin(Math.PI * clamp(value, 0, 1)), .58);
 }
 
 function breathPhase(t, cycleSeconds = SIGNAL.breathCycleSeconds) {
