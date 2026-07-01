@@ -431,6 +431,18 @@ select {
   outline-offset: 2px;
 }
 
+.site-motto {
+  position: fixed;
+  left: 12px;
+  bottom: 10px;
+  z-index: 6;
+  color: var(--muted);
+  font: 12px/1 var(--font);
+  text-transform: uppercase;
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
 @media (max-width: 820px) {
   .topbar {
     top: 8px;
@@ -484,8 +496,14 @@ select {
   .readout {
     left: 8px;
     right: 8px;
-    bottom: 8px;
+    bottom: 28px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .site-motto {
+    left: 8px;
+    bottom: 8px;
+    font-size: 11px;
   }
 
   .readout > div {
