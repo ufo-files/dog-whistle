@@ -434,7 +434,7 @@ select {
 .site-motto {
   position: fixed;
   left: 12px;
-  bottom: 88px;
+  bottom: 76px;
   z-index: 6;
   color: var(--muted);
   font: 12px/1 var(--font);
@@ -502,7 +502,7 @@ select {
 
   .site-motto {
     left: 8px;
-    bottom: 158px;
+    bottom: 146px;
     font-size: 11px;
   }
 
