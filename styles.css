@@ -434,7 +434,7 @@ select {
 .site-motto {
   position: fixed;
   left: 12px;
-  bottom: 10px;
+  bottom: 88px;
   z-index: 6;
   color: var(--muted);
   font: 12px/1 var(--font);
@@ -496,13 +496,13 @@ select {
   .readout {
     left: 8px;
     right: 8px;
-    bottom: 28px;
+    bottom: 8px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .site-motto {
     left: 8px;
-    bottom: 8px;
+    bottom: 158px;
     font-size: 11px;
   }
 
