@@ -1,11 +1,11 @@
 name: Screenshots
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "screenshots/**"
-      - "README.md"
+  workflow_run:
+    workflows:
+      - Deploy to GitHub Pages
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
@@ -18,12 +18,13 @@ concurrency:
 jobs:
   capture:
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.UFO_FILES_WORKFLOW_TOKEN }}
-          ref: ${{ github.ref_name }}
+          ref: main
 
       - name: Set up Node
         uses: actions/setup-node@v4
