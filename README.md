@@ -8,6 +8,8 @@ Live site: https://ufo-files.github.io/dog-whistle/
 
 Repository: https://github.com/ufo-files/dog-whistle
 
+Anonymous tips: https://tips.hushline.app/to/ufo-files
+
 ## Screenshots
 
 ### Sphere
@@ -114,3 +116,5 @@ The site is hosted with GitHub Pages from the `main` branch.
 Live site: https://ufo-files.github.io/dog-whistle/
 
 Repository: https://github.com/ufo-files/dog-whistle
+
+Anonymous tips: https://tips.hushline.app/to/ufo-files
