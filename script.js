@@ -1,6 +1,9 @@
 const canvas = document.getElementById("waveform");
 const ctx = canvas.getContext("2d");
 const sphereCanvas = document.getElementById("sphere");
+const visualStage = document.getElementById("visual-stage");
+const controlsMenuToggle = document.getElementById("controls-menu-toggle");
+const controlsPanel = document.getElementById("controls-panel");
 const playButton = document.getElementById("play");
 const pulseButton = document.getElementById("pulse");
 const appSwitcher = document.getElementById("app-switcher");
@@ -10,6 +13,7 @@ const volumeInput = document.getElementById("volume");
 const statusEl = document.getElementById("status");
 const layerToggleInputs = Array.from(document.querySelectorAll(".layer-toggle"));
 const layerFrequencyInputs = Array.from(document.querySelectorAll(".layer-frequency-input"));
+let playOverlayTimer = 0;
 
 const TWO_PI = Math.PI * 2;
 const THREE_CDN_URL = "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js";
@@ -274,12 +278,32 @@ function hashNoise(index) {
 }
 
 function setButtonState() {
-  playButton.textContent = state.mode === "straight" ? "Stop" : "Play";
+  playButton.textContent = state.playing ? "Stop" : "Play";
   pulseButton.textContent = state.mode === "pulse" ? "Stop" : "Pulse";
   playButton.classList.toggle("active", state.mode === "straight");
   pulseButton.classList.toggle("active", state.mode === "pulse");
   pulseButton.setAttribute("aria-pressed", String(state.mode === "pulse"));
   binauralInput.checked = state.binaural;
+  updatePlaybackChrome();
+}
+
+function updatePlaybackChrome() {
+  document.body.classList.toggle("is-playing", state.playing);
+  showPlayOverlayTemporarily();
+}
+
+function showPlayOverlayTemporarily() {
+  document.body.classList.add("show-play-overlay");
+  clearTimeout(playOverlayTimer);
+  playOverlayTimer = window.setTimeout(() => {
+    document.body.classList.remove("show-play-overlay");
+  }, 1400);
+}
+
+function setControlsOpen(open) {
+  document.body.classList.toggle("controls-open", open);
+  controlsMenuToggle.setAttribute("aria-expanded", String(open));
+  controlsMenuToggle.setAttribute("aria-label", open ? "Close controls" : "Open controls");
 }
 
 function setLayerControlState() {
@@ -1462,6 +1486,19 @@ function clamp(value, min, max) {
 
 playButton.addEventListener("click", togglePlay);
 pulseButton.addEventListener("click", togglePulse);
+controlsMenuToggle.addEventListener("click", () => {
+  setControlsOpen(!document.body.classList.contains("controls-open"));
+});
+visualStage.addEventListener("pointermove", showPlayOverlayTemporarily);
+visualStage.addEventListener("pointerdown", showPlayOverlayTemporarily);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") setControlsOpen(false);
+});
+document.addEventListener("pointerdown", (event) => {
+  if (!document.body.classList.contains("controls-open")) return;
+  if (controlsPanel.contains(event.target) || controlsMenuToggle.contains(event.target)) return;
+  setControlsOpen(false);
+});
 appSwitcher.addEventListener("change", () => {
   if (appSwitcher.value && appSwitcher.value !== window.location.href) {
     window.location.href = appSwitcher.value;
@@ -1484,4 +1521,5 @@ layerFrequencyInputs.forEach((input) => {
 });
 
 setLayerControlState();
+showPlayOverlayTemporarily();
 draw();
