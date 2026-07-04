@@ -4,6 +4,8 @@ const sphereCanvas = document.getElementById("sphere");
 const visualStage = document.getElementById("visual-stage");
 const controlsMenuToggle = document.getElementById("controls-menu-toggle");
 const controlsPanel = document.getElementById("controls-panel");
+const tonesToggle = document.getElementById("tones-toggle");
+const tonesPanel = document.getElementById("tones-panel");
 const playButton = document.getElementById("play");
 const pulseButton = document.getElementById("pulse");
 const appSwitcher = document.getElementById("app-switcher");
@@ -304,6 +306,12 @@ function setControlsOpen(open) {
   document.body.classList.toggle("controls-open", open);
   controlsMenuToggle.setAttribute("aria-expanded", String(open));
   controlsMenuToggle.setAttribute("aria-label", open ? "Close controls" : "Open controls");
+}
+
+function setTonesOpen(open) {
+  document.body.classList.toggle("tones-open", open);
+  tonesToggle.setAttribute("aria-expanded", String(open));
+  tonesToggle.setAttribute("aria-label", open ? "Close tones" : "Open tones");
 }
 
 function setLayerControlState() {
@@ -1489,15 +1497,27 @@ pulseButton.addEventListener("click", togglePulse);
 controlsMenuToggle.addEventListener("click", () => {
   setControlsOpen(!document.body.classList.contains("controls-open"));
 });
+tonesToggle.addEventListener("click", () => {
+  setTonesOpen(!document.body.classList.contains("tones-open"));
+});
 visualStage.addEventListener("pointermove", showPlayOverlayTemporarily);
 visualStage.addEventListener("pointerdown", showPlayOverlayTemporarily);
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") setControlsOpen(false);
+  if (event.key !== "Escape") return;
+  setControlsOpen(false);
+  setTonesOpen(false);
 });
 document.addEventListener("pointerdown", (event) => {
-  if (!document.body.classList.contains("controls-open")) return;
-  if (controlsPanel.contains(event.target) || controlsMenuToggle.contains(event.target)) return;
-  setControlsOpen(false);
+  if (document.body.classList.contains("controls-open")
+    && !controlsPanel.contains(event.target)
+    && !controlsMenuToggle.contains(event.target)) {
+    setControlsOpen(false);
+  }
+  if (document.body.classList.contains("tones-open")
+    && !tonesPanel.contains(event.target)
+    && !tonesToggle.contains(event.target)) {
+    setTonesOpen(false);
+  }
 });
 appSwitcher.addEventListener("change", () => {
   if (appSwitcher.value && appSwitcher.value !== window.location.href) {

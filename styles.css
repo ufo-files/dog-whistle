@@ -356,6 +356,10 @@ select {
   outline-offset: 2px;
 }
 
+.tones-toggle {
+  display: none;
+}
+
 .readout {
   position: fixed;
   left: 12px;
@@ -625,6 +629,25 @@ select {
     font-size: 11px;
   }
 
+  .tones-toggle {
+    position: fixed;
+    left: 8px;
+    bottom: 8px;
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 74px;
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    font: inherit;
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+
   .readout > div {
     padding: 8px 10px;
   }
@@ -637,8 +660,15 @@ select {
   .readout {
     left: 8px;
     right: 8px;
-    bottom: 8px;
+    bottom: 46px;
+    display: none;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: min(64vh, 360px);
+    overflow-y: auto;
+  }
+
+  body.tones-open .readout {
+    display: grid;
   }
 
   .readout > div:nth-child(2n)::after {
