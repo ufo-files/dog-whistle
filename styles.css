@@ -571,13 +571,21 @@ select {
 
 .site-motto {
   display: flex;
+  width: 100%;
+  justify-content: space-between;
   gap: 12px;
   align-items: center;
   margin-top: 3px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
   color: var(--muted);
   font: 12px/1 var(--font);
   text-transform: uppercase;
   letter-spacing: 0;
+}
+
+.site-motto > * {
+  white-space: nowrap;
 }
 
 .site-motto a {
