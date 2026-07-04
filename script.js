@@ -61,7 +61,7 @@ const SPHERE_ORBIT_BASE_DRIVE = .72;
 const SPHERE_ORBIT_BASE_STEP = .018;
 const SPHERE_PAD_ORBIT_RADIUS = .065;
 const SPHERE_PAD_ORBIT_SPEED = 1.4;
-const SPHERE_BREATH_POINT_SCALE = .42;
+const SPHERE_BREATH_POINT_SCALE = 5 / 6;
 const SPHERE_BREATH_OPACITY_SCALE = .78;
 const SPHERE_BREATH_SWELL_SCALE = .18;
 const SPHERE_BREATH_ORBIT_RADIUS = .064;
@@ -69,6 +69,7 @@ const SPHERE_BREATH_ORBIT_SPEED = 1.65;
 const SPHERE_BREATH_ORBIT_STEP = .034;
 const SPHERE_BREATH_ORBIT_SLOPE_REFERENCE = .003;
 const SPHERE_BREATH_ORBIT_MIN_DRIVE = .38;
+const SPHERE_BREATH_LAYER_ROTATION_SPEED = .72;
 const SPHERE_CHIRP_ORBIT_RADIUS = .18;
 const SPHERE_CHIRP_ORBIT_SPEED = 3;
 const SPHERE_CHIRP_DOT_SCALE = .78;
@@ -117,6 +118,9 @@ const SPHERE_LAYER_RADIAL_SCALE = {
   breath: 0,
 };
 const SPHERE_BREATH_CORE_RADIUS = .34;
+const SPHERE_BREATH_GAIA_INNER_RADIUS = .055;
+const SPHERE_BREATH_GAIA_OUTER_RADIUS = .42;
+const GAIA_STAR_COUNT_TARGET = 12000;
 const LAYER_DEFAULTS = {
   carrier: { enabled: true, frequency: 100, min: 20, max: 1000, step: .01, unit: "Hz" },
   pad: { enabled: true, frequency: 432, min: 20, max: 20000, step: .01, unit: "Hz" },
@@ -143,6 +147,8 @@ const DISPLAY_LAYERS = [
   { id: "chirp", label: "2.5k", alpha: loudnessAlpha(.058), width: loudnessStroke(.058) },
   { id: "breath", label: "air", alpha: loudnessAlpha(.068), width: loudnessStroke(.068) },
 ];
+const gaiaCatalog = window.UNIVERSE_STARS_DATA || { count: 0, stars: [] };
+const gaiaStars = prepareGaiaStars((gaiaCatalog.stars || []).slice(0, GAIA_STAR_COUNT_TARGET));
 
 const state = {
   audio: null,
@@ -277,6 +283,10 @@ function smoothstep(value) {
 function hashNoise(index) {
   const value = Math.sin(index * 127.1 + 311.7) * 43758.5453123;
   return (value - Math.floor(value)) * 2 - 1;
+}
+
+function hashUnit(index) {
+  return hashNoise(index) * .5 + .5;
 }
 
 function setButtonState() {
@@ -619,24 +629,29 @@ function createSphereLedLayer(THREE, layer, material, count, seedOffset, pointTe
   const positions = new Float32Array(count * 3);
   const directions = new Float32Array(count * 3);
   const phases = new Float32Array(count);
+  const baseRadii = new Float32Array(count);
   const radialVariances = new Float32Array(count);
   const displacements = new Float32Array(count);
   const initialRadius = layer.id === "breath" ? SPHERE_BREATH_CORE_RADIUS : SPHERE_RADIUS;
 
   for (let i = 0; i < count; i += 1) {
     const offset = i * 3;
-    const point = seededSpherePoint(i + seedOffset);
+    const point = layer.id === "breath"
+      ? gaiaBreathPoint(i, seedOffset)
+      : seededSpherePoint(i + seedOffset);
     const nx = point.x;
     const ny = point.y;
     const nz = point.z;
+    const pointRadius = point.radius || initialRadius;
 
     directions[offset] = nx;
     directions[offset + 1] = ny;
     directions[offset + 2] = nz;
-    positions[offset] = nx * initialRadius;
-    positions[offset + 1] = ny * initialRadius;
-    positions[offset + 2] = nz * initialRadius;
-    phases[i] = spherePhase(nx, ny, nz);
+    positions[offset] = nx * pointRadius;
+    positions[offset + 1] = ny * pointRadius;
+    positions[offset + 2] = nz * pointRadius;
+    phases[i] = point.phase ?? spherePhase(nx, ny, nz);
+    baseRadii[i] = pointRadius;
     radialVariances[i] = .62 + (hashNoise(i + seedOffset + 211) * .5 + .5) * .76;
   }
 
@@ -654,6 +669,7 @@ function createSphereLedLayer(THREE, layer, material, count, seedOffset, pointTe
     points: new THREE.Points(geometry, material),
     directions,
     phases,
+    baseRadii,
     radialVariances,
     displacements,
     trails,
@@ -733,6 +749,44 @@ function seededSpherePoint(index) {
   };
 }
 
+function prepareGaiaStars(rawStars) {
+  const radii = rawStars.map((star) => Math.hypot(star.x, star.y, star.z)).filter((radius) => radius > 0);
+  if (!radii.length) return [];
+
+  const minRadius = Math.min(...radii);
+  const maxRadius = Math.max(...radii);
+  const logRange = Math.log1p(Math.max(1, maxRadius - minRadius));
+
+  return rawStars.map((star, index) => {
+    const rawRadius = Math.hypot(star.x, star.y, star.z) || 1;
+    const distanceDepth = Math.log1p(Math.max(0, rawRadius - minRadius)) / logRange;
+    const radius = SPHERE_BREATH_GAIA_INNER_RADIUS +
+      Math.pow(clamp(distanceDepth, 0, 1), .72) * (SPHERE_BREATH_GAIA_OUTER_RADIUS - SPHERE_BREATH_GAIA_INNER_RADIUS);
+
+    return {
+      x: star.x / rawRadius,
+      y: star.y / rawRadius,
+      z: star.z / rawRadius,
+      radius,
+      phase: hashUnit(index * 19 + 7),
+    };
+  });
+}
+
+function gaiaBreathPoint(index, seedOffset) {
+  if (!gaiaStars.length) {
+    const point = seededSpherePoint(index + seedOffset);
+    return {
+      ...point,
+      radius: SPHERE_BREATH_GAIA_INNER_RADIUS +
+        (hashUnit(index + seedOffset + 503) * (SPHERE_BREATH_GAIA_OUTER_RADIUS - SPHERE_BREATH_GAIA_INNER_RADIUS)),
+      phase: spherePhase(point.x, point.y, point.z),
+    };
+  }
+
+  return gaiaStars[(index * 7 + seedOffset) % gaiaStars.length];
+}
+
 function spherePhase(nx, ny, nz) {
   const xy = (Math.atan2(ny, nx) + Math.PI) / TWO_PI;
   const yz = (Math.atan2(nz, ny) + Math.PI) / TWO_PI;
@@ -782,6 +836,7 @@ function updateSphereLedLayer({ ledLayer, metrics, active }) {
     trail.points.visible = ledLayer.points.visible;
   });
   if (!ledLayer.points.visible) return;
+  if (ledLayer.layer.id === "breath") rotateBreathVolume(ledLayer, active);
 
   const left = zoomSamples(visualLayerSamples(ledLayer.layer, "left"), .48);
   const right = zoomSamples(visualLayerSamples(ledLayer.layer, "right"), .48);
@@ -832,7 +887,11 @@ function updateSphereLedLayer({ ledLayer, metrics, active }) {
       chirpOrbitLift
       ) * (ledLayer.radialVariances ? ledLayer.radialVariances[i] : 1);
     const displacement = lerp(ledLayer.displacements[i] || 0, targetDisplacement, temporalBlend);
-    const radius = baseRadius + coreSwell + displacement;
+    const pointBaseRadius = isBreath && ledLayer.baseRadii ? ledLayer.baseRadii[i] : baseRadius;
+    const breathSwellScale = isBreath
+      ? .72 + pointBaseRadius / SPHERE_BREATH_GAIA_OUTER_RADIUS * .28
+      : 1;
+    const radius = pointBaseRadius + coreSwell * breathSwellScale + displacement;
 
     ledLayer.displacements[i] = displacement;
     let targetX;
@@ -859,6 +918,13 @@ function updateSphereLedLayer({ ledLayer, metrics, active }) {
 
   ledLayer.geometry.attributes.position.needsUpdate = true;
   if (ledLayer.trails && surfaceOrbit) updateSurfaceTrails(ledLayer);
+}
+
+function rotateBreathVolume(ledLayer, active) {
+  const motion = Math.max(.18, active) * SPHERE_BREATH_LAYER_ROTATION_SPEED;
+  ledLayer.points.rotation.x += .00026 * motion;
+  ledLayer.points.rotation.y += .00054 * motion;
+  ledLayer.points.rotation.z -= .00018 * motion;
 }
 
 function updatePingJump(ledLayer, layerPeak, active) {
@@ -1087,7 +1153,8 @@ function harmonicTrailAbsorption({ source, sourceOffset, neighbor, neighborOffse
 function resetSphereDisplacementMemory() {
   if (sphereState.displacements) sphereState.displacements.fill(0);
   sphereState.ledLayers.forEach((ledLayer) => {
-    const baseRadius = ledLayer.layer.id === "breath" ? SPHERE_BREATH_CORE_RADIUS : SPHERE_RADIUS;
+    const isBreath = ledLayer.layer.id === "breath";
+    const baseRadius = isBreath ? SPHERE_BREATH_CORE_RADIUS : SPHERE_RADIUS;
     const positions = ledLayer.geometry.attributes.position.array;
 
     ledLayer.displacements.fill(0);
@@ -1097,9 +1164,11 @@ function resetSphereDisplacementMemory() {
     ledLayer.pingJump = 0;
     ledLayer.eventVisibility = 0;
     for (let i = 0; i < ledLayer.directions.length; i += 3) {
-      positions[i] = ledLayer.directions[i] * baseRadius;
-      positions[i + 1] = ledLayer.directions[i + 1] * baseRadius;
-      positions[i + 2] = ledLayer.directions[i + 2] * baseRadius;
+      const pointIndex = i / 3;
+      const pointBaseRadius = isBreath && ledLayer.baseRadii ? ledLayer.baseRadii[pointIndex] : baseRadius;
+      positions[i] = ledLayer.directions[i] * pointBaseRadius;
+      positions[i + 1] = ledLayer.directions[i + 1] * pointBaseRadius;
+      positions[i + 2] = ledLayer.directions[i + 2] * pointBaseRadius;
     }
     ledLayer.geometry.attributes.position.needsUpdate = true;
     if (ledLayer.trailHistory) {
