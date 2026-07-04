@@ -349,8 +349,8 @@ select {
 }
 
 .controls > .toggle {
-  min-height: 44px;
-  padding-block: 5px;
+  min-height: 36px;
+  padding: 0 0 4px;
 }
 
 .toggle input {
@@ -648,8 +648,8 @@ select {
   }
 
   .controls > .toggle {
-    min-height: 40px;
-    padding-block: 5px;
+    min-height: 34px;
+    padding: 0 0 4px;
   }
 
   .field {
