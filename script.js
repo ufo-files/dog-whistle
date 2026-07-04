@@ -519,7 +519,7 @@ function ensureSphereRenderer() {
     })
     .catch(() => {
       sphereState.loading = false;
-      sphereState.error = "Sphere view needs Three.js";
+      sphereState.error = "Orb view needs Three.js";
     });
 }
 
@@ -1172,7 +1172,7 @@ function drawSphereLoading(width, height) {
   ctx.font = "12px " + getComputedStyle(document.body).fontFamily;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(sphereState.error || "Loading sphere", width * .5, height * .52);
+  ctx.fillText(sphereState.error || "Loading orb", width * .5, height * .52);
   ctx.restore();
 }
 

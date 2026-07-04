@@ -12,9 +12,9 @@ Anonymous tips: https://tips.hushline.app/to/ufo-files
 
 ## Screenshots
 
-### Sphere
+### Orb
 
-![Dog Whistle sphere view while playing](screenshots/dog-whistle-sphere.png)
+![Dog Whistle orb view while playing](screenshots/dog-whistle-sphere.png)
 
 ### Circle
 
@@ -41,7 +41,7 @@ Playback and visualization use the same generated output buffers. The frequencie
 
 - Play the signal straight.
 - Pulse the signal with a slow amplitude envelope.
-- Switch between Sphere, Circle, and Waveform visualizations.
+- Switch between Orb, Circle, and Waveform visualizations.
 - Toggle Headphones mode for the binaural carrier split.
 - Switch to Speakers mode for centered mono output.
 - Toggle individual sound layers on and off.
@@ -62,15 +62,15 @@ The 17 kHz ping is always part of the main signal. It is not optional or gated b
 
 ## Visual Modes
 
-The app defaults to Sphere and has three visualization modes: Sphere, Circle, and Waveform.
+The app defaults to Orb and has three visualization modes: Orb, Circle, and Waveform.
 
-- **Sphere** renders six tone-specific LED layers that share a total 32,000-point budget. Each layer reads from the matching `state.liveLayers` buffer. The breath layer renders as a smaller inner dot sphere with its radius subtly swelling from measured breath RMS.
+- **Orb** renders six tone-specific LED layers that share a total 32,000-point budget. Each layer reads from the matching `state.liveLayers` buffer. The breath layer renders as a smaller inner dot orb with its radius subtly swelling from measured breath RMS.
 - **Circle** renders the same six tone layers as circular traces. In Headphones mode it shows the left/right split; in Speakers mode it renders each tone as one full circular trace.
 - **Waveform** renders the six tone layers as live horizontal traces for the left and right output channels.
 
-Sphere uses visual low-pass smoothing so high-frequency tones do not render as hard jagged edges. Short-event layers such as chirp and ping get higher visual gain so their brief peaks remain visible without changing the audio. The LED layers use deterministic unsequenced points and blended 3D projection sampling so no stem/butt axis or beginning/end wrap becomes visually privileged.
+Orb uses visual low-pass smoothing so high-frequency tones do not render as hard jagged edges. Short-event layers such as chirp and ping get higher visual gain so their brief peaks remain visible without changing the audio. The LED layers use deterministic unsequenced points and blended 3D projection sampling so no stem/butt axis or beginning/end wrap becomes visually privileged.
 
-In Headphones mode, Sphere crossfades the left and right sample buffers across the surface instead of assigning hard hemispheres. In Speakers mode, Sphere averages the left and right buffers into one mono displacement field. Sphere geometry updates are capped at 30fps to keep the main-thread Web Audio path from crackling under visual load.
+In Headphones mode, Orb crossfades the left and right sample buffers across the surface instead of assigning hard hemispheres. In Speakers mode, Orb averages the left and right buffers into one mono displacement field. Orb geometry updates are capped at 30fps to keep the main-thread Web Audio path from crackling under visual load.
 
 ## Files
 
@@ -81,7 +81,7 @@ The app is fully static. All runtime code is committed in this repository.
 | `index.html` | Application shell and controls |
 | `styles.css` | Minimal monochrome interface styling |
 | `script.js` | Web Audio synthesis, playback controls, and visualizers |
-| `scripts/capture_screenshots.js` | Captures README screenshots for Sphere, Circle, and Waveform while playing |
+| `scripts/capture_screenshots.js` | Captures README screenshots for Orb, Circle, and Waveform while playing |
 | `.github/workflows/pages.yml` | GitHub Pages deployment workflow |
 | `.github/workflows/screenshots.yml` | Refreshes committed screenshots after app changes |
 
@@ -97,7 +97,7 @@ python3 -m http.server 4173
 
 Then open `http://localhost:4173/`.
 
-Sphere mode lazy-loads Three.js from jsDelivr. Circle and Waveform do not require that dependency.
+Orb mode lazy-loads Three.js from jsDelivr. Circle and Waveform do not require that dependency.
 
 No OpenAI API key or external service is required to generate the audio.
 
@@ -107,7 +107,7 @@ Anyone can fork the repository and open a pull request. Merging to `main` requir
 
 ## Limits
 
-This is an experimental signal player and visualizer, not evidence that any tone summons, detects, or communicates with UAP. The visualizations are data-derived from the generated buffers, but they are not raw oscilloscope plots. Sphere mode applies smoothing, projection sampling, per-layer visual gain, and temporal easing so the 3D form remains readable.
+This is an experimental signal player and visualizer, not evidence that any tone summons, detects, or communicates with UAP. The visualizations are data-derived from the generated buffers, but they are not raw oscilloscope plots. Orb mode applies smoothing, projection sampling, per-layer visual gain, and temporal easing so the 3D form remains readable.
 
 ## Deployment
 
