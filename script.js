@@ -24,9 +24,68 @@ const SPHERE_WAVE_SCALE = 1.18;
 const SPHERE_ENERGY_SCALE = .62;
 const SPHERE_SAMPLE_SMOOTHING = .017;
 const SPHERE_TEMPORAL_BLEND = .3;
+const SPHERE_LAYER_TEMPORAL_BLEND = {
+  carrier: .08,
+  chirp: .78,
+};
+const SPHERE_POSITION_BLEND = .34;
+const SPHERE_LAYER_POSITION_BLEND = {
+  breath: .12,
+  carrier: .22,
+  ping: .82,
+  chirp: .86,
+};
 const SPHERE_LED_SIZE = .026;
-const SPHERE_LED_COUNT = 32000;
+const SPHERE_LED_COUNT = 84000;
 const SPHERE_UPDATE_INTERVAL_MS = 16;
+const SPHERE_GLOBAL_OPACITY_SCALE = .58;
+const SPHERE_NON_BREATH_DOT_SCALE = 1;
+const SPHERE_NON_BREATH_OPACITY_SCALE = .56;
+const SPHERE_HARMONIC_ORBIT_RADIUS = .13;
+const SPHERE_HARMONIC_DOT_SCALE = .72;
+const SPHERE_HARMONIC_TRAIL_COUNT = 20;
+const SPHERE_HARMONIC_TRAIL_FRAME_STEP = 3;
+const SPHERE_HARMONIC_TRAIL_STRIDE = 1;
+const SPHERE_HARMONIC_ORBIT_SPEED = 3;
+const SPHERE_HARMONIC_TRAIL_ABSORB_DISTANCE = .3;
+const SPHERE_HARMONIC_TRAIL_ABSORB_STRENGTH = .32;
+const SPHERE_DEFAULT_ORBIT_RADIUS = .045;
+const SPHERE_DEFAULT_ORBIT_SPEED = 1.6;
+const SPHERE_ORBIT_BASE_DRIVE = .72;
+const SPHERE_ORBIT_BASE_STEP = .018;
+const SPHERE_PAD_ORBIT_RADIUS = .065;
+const SPHERE_PAD_ORBIT_SPEED = 1.4;
+const SPHERE_BREATH_POINT_SCALE = .42;
+const SPHERE_BREATH_OPACITY_SCALE = .78;
+const SPHERE_BREATH_SWELL_SCALE = .18;
+const SPHERE_BREATH_ORBIT_RADIUS = .064;
+const SPHERE_BREATH_ORBIT_SPEED = 1.65;
+const SPHERE_BREATH_ORBIT_STEP = .034;
+const SPHERE_BREATH_ORBIT_SLOPE_REFERENCE = .003;
+const SPHERE_BREATH_ORBIT_MIN_DRIVE = .38;
+const SPHERE_CHIRP_ORBIT_RADIUS = .18;
+const SPHERE_CHIRP_ORBIT_SPEED = 3;
+const SPHERE_CHIRP_DOT_SCALE = .78;
+const SPHERE_CHIRP_IDLE_ORBIT_DRIVE = .34;
+const SPHERE_CHIRP_IDLE_ORBIT_STEP = .014;
+const SPHERE_CHIRP_ORBIT_LIFT_SCALE = .04;
+const SPHERE_CHIRP_DARKEN_SCALE = .34;
+const SPHERE_CHIRP_LIFT_TWIST_SCALE = .42;
+const SPHERE_PING_DOT_SCALE = .58;
+const SPHERE_PING_JUMP_SCALE = .22;
+const SPHERE_PING_JUMP_ATTACK = .68;
+const SPHERE_PING_JUMP_RELEASE = .52;
+const SPHERE_PLASMA_PHASE_SPEED = .011;
+const SPHERE_PLASMA_LAYER_PHASE = {
+  carrier: 0,
+  pad: .19,
+  harmonic: .37,
+  chirp: .58,
+};
+const SPHERE_EVENT_LAYER_VISIBILITY = {
+  ping: { reference: .01, floor: 0 },
+  chirp: { reference: .018, floor: 0 },
+};
 const SPHERE_LAYER_GAIN = {
   carrier: 1,
   pad: 1.08,
@@ -42,6 +101,14 @@ const SPHERE_LAYER_ENERGY_GAIN = {
   ping: 2.8,
   chirp: 1.7,
   breath: .9,
+};
+const SPHERE_LAYER_RADIAL_SCALE = {
+  carrier: .035,
+  pad: .42,
+  harmonic: .05,
+  ping: .28,
+  chirp: .16,
+  breath: 0,
 };
 const SPHERE_BREATH_CORE_RADIUS = .34;
 const LAYER_DEFAULTS = {
@@ -99,6 +166,7 @@ const sphereState = {
   camera: null,
   mesh: null,
   ledLayers: [],
+  plasmaPhase: 0,
   lastGeometryUpdate: 0,
 };
 
@@ -441,7 +509,10 @@ function createSphereRenderer(THREE) {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
   }
   camera.position.z = SPHERE_CAMERA_Z;
-  ledLayers.forEach((ledLayer) => group.add(ledLayer.points));
+  ledLayers.forEach((ledLayer) => {
+    if (ledLayer.trails) ledLayer.trails.forEach((trail) => group.add(trail.points));
+    group.add(ledLayer.points);
+  });
   scene.add(group);
 
   sphereState.THREE = THREE;
@@ -462,7 +533,7 @@ function createSpherePointTexture(THREE) {
   const textureCtx = textureCanvas.getContext("2d");
   const gradient = textureCtx.createRadialGradient(32, 32, 0, 32, 32, 30);
   gradient.addColorStop(0, "rgba(17, 17, 17, 1)");
-  gradient.addColorStop(.62, "rgba(17, 17, 17, .9)");
+  gradient.addColorStop(.62, "rgba(17, 17, 17, .86)");
   gradient.addColorStop(1, "rgba(17, 17, 17, 0)");
   textureCtx.fillStyle = gradient;
   textureCtx.beginPath();
@@ -475,36 +546,50 @@ function createSpherePointTexture(THREE) {
 }
 
 function createSphereLedLayers(THREE, pointTexture) {
-  const baseCount = Math.floor(SPHERE_LED_COUNT / DISPLAY_LAYERS.length);
-  let remainder = SPHERE_LED_COUNT - baseCount * DISPLAY_LAYERS.length;
+  const layerWeights = DISPLAY_LAYERS.map((layer) => layer.id === "breath" ? SPHERE_BREATH_POINT_SCALE : 1);
+  const totalWeight = layerWeights.reduce((sum, weight) => sum + weight, 0);
+  let assignedCount = 0;
 
   return DISPLAY_LAYERS.map((layer, index) => {
-    const count = baseCount + (remainder > 0 ? 1 : 0);
-    remainder = Math.max(0, remainder - 1);
+    const remainingLayers = DISPLAY_LAYERS.length - index - 1;
+    const targetCount = Math.floor(SPHERE_LED_COUNT * layerWeights[index] / totalWeight);
+    const count = index === DISPLAY_LAYERS.length - 1
+      ? SPHERE_LED_COUNT - assignedCount
+      : Math.max(1, Math.min(targetCount, SPHERE_LED_COUNT - assignedCount - remainingLayers));
+    assignedCount += count;
     const visualGain = SPHERE_LAYER_GAIN[layer.id] || 1;
     const coreScale = layer.id === "breath" ? .72 : 1;
-    const opacityScale = layer.id === "ping" ? .38 : layer.id === "breath" ? 1.5 : 1;
+    const nonBreathScale = layer.id === "breath" ? 1 : SPHERE_NON_BREATH_DOT_SCALE;
+    const nonBreathOpacityScale = layer.id === "breath" ? 1 : SPHERE_NON_BREATH_OPACITY_SCALE;
+    const harmonicScale = layer.id === "harmonic" ? SPHERE_HARMONIC_DOT_SCALE : 1;
+    const pingScale = layer.id === "ping" ? SPHERE_PING_DOT_SCALE : 1;
+    const chirpScale = layer.id === "chirp" ? SPHERE_CHIRP_DOT_SCALE : 1;
+    const opacityScale = layer.id === "ping" ? 2.4 : layer.id === "chirp" ? 1.7 : layer.id === "breath" ? SPHERE_BREATH_OPACITY_SCALE : layer.id === "harmonic" ? .16 : 1;
+    const minOpacity = layer.id === "harmonic" ? .025 : .08;
+    const opacity = clamp(layer.alpha * (.72 + visualGain * .18) * opacityScale * nonBreathOpacityScale * SPHERE_GLOBAL_OPACITY_SCALE, minOpacity, .82);
     const material = new THREE.PointsMaterial({
       color: 0x111111,
-      size: SPHERE_LED_SIZE * (.5 + layer.width * .16) * Math.sqrt(visualGain) * coreScale,
+      size: SPHERE_LED_SIZE * (.5 + layer.width * .16) * Math.sqrt(visualGain) * coreScale * nonBreathScale * harmonicScale * pingScale * chirpScale,
       map: pointTexture,
       transparent: true,
-      opacity: clamp(layer.alpha * (.72 + visualGain * .18) * opacityScale, .08, .82),
+      opacity,
       alphaTest: .03,
       depthWrite: false,
       sizeAttenuation: true,
     });
 
-    return createSphereLedLayer(THREE, layer, material, count, index * 100000);
+    return createSphereLedLayer(THREE, layer, material, count, index * 100000, pointTexture, opacity);
   });
 }
 
-function createSphereLedLayer(THREE, layer, material, count, seedOffset) {
+function createSphereLedLayer(THREE, layer, material, count, seedOffset, pointTexture, baseOpacity) {
   const geometry = new THREE.BufferGeometry();
   const positions = new Float32Array(count * 3);
   const directions = new Float32Array(count * 3);
   const phases = new Float32Array(count);
+  const radialVariances = new Float32Array(count);
   const displacements = new Float32Array(count);
+  const initialRadius = layer.id === "breath" ? SPHERE_BREATH_CORE_RADIUS : SPHERE_RADIUS;
 
   for (let i = 0; i < count; i += 1) {
     const offset = i * 3;
@@ -516,23 +601,84 @@ function createSphereLedLayer(THREE, layer, material, count, seedOffset) {
     directions[offset] = nx;
     directions[offset + 1] = ny;
     directions[offset + 2] = nz;
-    positions[offset] = nx * SPHERE_RADIUS;
-    positions[offset + 1] = ny * SPHERE_RADIUS;
-    positions[offset + 2] = nz * SPHERE_RADIUS;
+    positions[offset] = nx * initialRadius;
+    positions[offset + 1] = ny * initialRadius;
+    positions[offset + 2] = nz * initialRadius;
     phases[i] = spherePhase(nx, ny, nz);
+    radialVariances[i] = .62 + (hashNoise(i + seedOffset + 211) * .5 + .5) * .76;
   }
 
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
+  const trails = surfaceTrailLayer(layer.id)
+    ? createSurfaceTrails(THREE, layer, count, pointTexture)
+    : null;
+
   return {
     layer,
     geometry,
+    material,
+    baseOpacity,
     points: new THREE.Points(geometry, material),
     directions,
     phases,
+    radialVariances,
     displacements,
+    trails,
+    trailHistory: surfaceTrailLayer(layer.id) ? createSurfaceTrailHistory(positions) : null,
     swell: 0,
   };
+}
+
+function createSurfaceTrailHistory(positions) {
+  return Array.from({ length: SPHERE_HARMONIC_TRAIL_COUNT * SPHERE_HARMONIC_TRAIL_FRAME_STEP }, () => new Float32Array(positions));
+}
+
+function createSurfaceTrails(THREE, layer, count, pointTexture) {
+  const trails = [];
+  const pointIndices = [];
+
+  for (let i = 0; i < count; i += SPHERE_HARMONIC_TRAIL_STRIDE) {
+    pointIndices.push(i);
+  }
+
+  for (let i = 0; i < SPHERE_HARMONIC_TRAIL_COUNT; i += 1) {
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(pointIndices.length * 3);
+    const fade = 1 - (i + 1) / SPHERE_HARMONIC_TRAIL_COUNT;
+    const opacity = layer.alpha * .36 * fade * fade * SPHERE_GLOBAL_OPACITY_SCALE * SPHERE_NON_BREATH_OPACITY_SCALE;
+    const material = new THREE.PointsMaterial({
+      color: 0x555555,
+      size: SPHERE_LED_SIZE * (.72 + layer.width * .14) * SPHERE_HARMONIC_DOT_SCALE * SPHERE_NON_BREATH_DOT_SCALE * (1 - i * .018),
+      map: pointTexture,
+      transparent: true,
+      opacity,
+      alphaTest: .001,
+      depthWrite: false,
+      sizeAttenuation: true,
+    });
+
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const points = new THREE.Points(geometry, material);
+    points.renderOrder = 4;
+    trails.push({
+      geometry,
+      positions,
+      pointIndices,
+      step: i,
+      points,
+    });
+  }
+
+  return trails;
+}
+
+function surfaceOrbitLayer(layerId) {
+  return DISPLAY_LAYERS.some((layer) => layer.id === layerId) && layerId !== "ping";
+}
+
+function surfaceTrailLayer(layerId) {
+  return surfaceOrbitLayer(layerId) && layerId !== "breath";
 }
 
 function seededSpherePoint(index) {
@@ -577,10 +723,19 @@ function updateSphereGeometry(active) {
   const right = zoomSamples(readLiveSamples(state.liveChannels.right), .48);
   const metrics = sphereSignalMetrics(left, right);
 
+  updatePlasmaPhase(metrics, active);
   updateSphereLedLayers({ metrics, active });
   sphereState.mesh.rotation.x += .0018 * active;
   sphereState.mesh.rotation.y += .0026 * active;
   sphereState.mesh.rotation.z += .0011 * active;
+}
+
+function updatePlasmaPhase(metrics, active) {
+  const energyDrive = clamp(metrics.energy / .06, 0, 1);
+  sphereState.plasmaPhase = positiveModulo(
+    sphereState.plasmaPhase + SPHERE_PLASMA_PHASE_SPEED * (.55 + energyDrive * .9) * Math.max(.35, active),
+    1
+  );
 }
 
 function updateSphereLedLayers({ metrics, active }) {
@@ -591,6 +746,9 @@ function updateSphereLedLayers({ metrics, active }) {
 
 function updateSphereLedLayer({ ledLayer, metrics, active }) {
   ledLayer.points.visible = layerEnabled(ledLayer.layer.id);
+  if (ledLayer.trails) ledLayer.trails.forEach((trail) => {
+    trail.points.visible = ledLayer.points.visible;
+  });
   if (!ledLayer.points.visible) return;
 
   const left = zoomSamples(visualLayerSamples(ledLayer.layer, "left"), .48);
@@ -599,17 +757,31 @@ function updateSphereLedLayer({ ledLayer, metrics, active }) {
   const layerPeak = peakAbs(left, right);
   const displacementGain = SPHERE_LAYER_GAIN[ledLayer.layer.id] || 1;
   const energyGain = SPHERE_LAYER_ENERGY_GAIN[ledLayer.layer.id] || .55;
-  const eventLift = layerPeak * energyGain * SPHERE_ENERGY_SCALE * active;
+  const radialScale = SPHERE_LAYER_RADIAL_SCALE[ledLayer.layer.id] ?? .25;
+  const eventLift = layerPeak * energyGain * SPHERE_ENERGY_SCALE * active * radialScale;
+  const pingJump = ledLayer.layer.id === "ping"
+    ? updatePingJump(ledLayer, layerPeak, active)
+    : 0;
+  updateEventLayerOpacity(ledLayer, { layerEnergy, layerPeak, active });
   const isBreath = ledLayer.layer.id === "breath";
   const baseRadius = isBreath ? SPHERE_BREATH_CORE_RADIUS : SPHERE_RADIUS;
   const breathMotion = isBreath ? latestLiveSample(state.liveBreathEnvelope) : 0;
-  const targetCoreSwell = isBreath ? smoothstep(clamp(breathMotion, 0, 1)) * .34 * active : 0;
+  const targetCoreSwell = isBreath ? smoothstep(clamp(breathMotion, 0, 1)) * SPHERE_BREATH_SWELL_SCALE * active : 0;
   const coreSwell = isBreath ? lerp(ledLayer.swell || 0, targetCoreSwell, .06) : 0;
-  const waveformScale = isBreath ? 0 : 1;
-  const energyScale = isBreath ? 0 : 1;
+  const waveformScale = isBreath ? 0 : radialScale;
+  const energyScale = isBreath ? 0 : radialScale;
   const eventComponent = isBreath ? 0 : eventLift;
-  const mixedEnergyComponent = isBreath ? 0 : metrics.energy * SPHERE_ENERGY_SCALE * .12 * active;
+  const mixedEnergyComponent = isBreath ? 0 : metrics.energy * SPHERE_ENERGY_SCALE * .12 * active * radialScale;
   const positions = ledLayer.geometry.attributes.position.array;
+  const temporalBlend = SPHERE_LAYER_TEMPORAL_BLEND[ledLayer.layer.id] || SPHERE_TEMPORAL_BLEND;
+  const positionBlend = SPHERE_LAYER_POSITION_BLEND[ledLayer.layer.id] || SPHERE_POSITION_BLEND;
+  const surfaceOrbit = surfaceOrbitLayer(ledLayer.layer.id)
+    ? updateSurfaceOrbit(ledLayer, { left, right, layerEnergy, active })
+    : null;
+  const chirpOrbitLift = ledLayer.layer.id === "chirp" && surfaceOrbit
+    ? smoothstep(clamp(layerPeak / .018, 0, 1)) * SPHERE_CHIRP_ORBIT_LIFT_SCALE * active
+    : 0;
+  if (ledLayer.layer.id === "chirp") updateChirpDarkening(ledLayer, chirpOrbitLift);
   if (isBreath) ledLayer.swell = coreSwell;
 
   for (let i = 0; i < ledLayer.phases.length; i += 1) {
@@ -619,33 +791,313 @@ function updateSphereLedLayer({ ledLayer, metrics, active }) {
     const nz = ledLayer.directions[offset + 2];
     const sample = sphereDirectionalSampleAt({ left, right, nx, ny, nz });
     const targetDisplacement =
-      sample * SPHERE_WAVE_SCALE * displacementGain * waveformScale * active +
-      layerEnergy * SPHERE_ENERGY_SCALE * energyGain * energyScale * active +
+      (
+        sample * SPHERE_WAVE_SCALE * displacementGain * waveformScale * active +
+        layerEnergy * SPHERE_ENERGY_SCALE * energyGain * energyScale * active +
       eventComponent +
-      mixedEnergyComponent;
-    const displacement = lerp(ledLayer.displacements[i] || 0, targetDisplacement, SPHERE_TEMPORAL_BLEND);
+      mixedEnergyComponent +
+      pingJump +
+      chirpOrbitLift
+      ) * (ledLayer.radialVariances ? ledLayer.radialVariances[i] : 1);
+    const displacement = lerp(ledLayer.displacements[i] || 0, targetDisplacement, temporalBlend);
     const radius = baseRadius + coreSwell + displacement;
 
     ledLayer.displacements[i] = displacement;
-    positions[offset] = nx * radius;
-    positions[offset + 1] = ny * radius;
-    positions[offset + 2] = nz * radius;
+    let targetX;
+    let targetY;
+    let targetZ;
+    if (surfaceOrbit) {
+      const orbit = surfaceOrbitOffset({ nx, ny, nz, phase: ledLayer.phases[i], surfaceOrbit });
+      const liftTwist = ledLayer.layer.id === "chirp" && chirpOrbitLift
+        ? chirpOrbitLift * SPHERE_CHIRP_LIFT_TWIST_SCALE * (ledLayer.radialVariances ? ledLayer.radialVariances[i] : 1)
+        : 0;
+      targetX = nx * radius + orbit.x + orbit.x * liftTwist;
+      targetY = ny * radius + orbit.y + orbit.y * liftTwist;
+      targetZ = nz * radius + orbit.z + orbit.z * liftTwist;
+    } else {
+      targetX = nx * radius;
+      targetY = ny * radius;
+      targetZ = nz * radius;
+    }
+
+    positions[offset] = lerp(positions[offset], targetX, positionBlend);
+    positions[offset + 1] = lerp(positions[offset + 1], targetY, positionBlend);
+    positions[offset + 2] = lerp(positions[offset + 2], targetZ, positionBlend);
   }
 
   ledLayer.geometry.attributes.position.needsUpdate = true;
+  if (ledLayer.trails && surfaceOrbit) updateSurfaceTrails(ledLayer);
+}
+
+function updatePingJump(ledLayer, layerPeak, active) {
+  const target = smoothstep(clamp(layerPeak / .03, 0, 1)) * SPHERE_PING_JUMP_SCALE * active;
+  const current = ledLayer.pingJump || 0;
+  const easing = target > current ? SPHERE_PING_JUMP_ATTACK : SPHERE_PING_JUMP_RELEASE;
+  ledLayer.pingJump = lerp(current, target, easing);
+  return ledLayer.pingJump;
+}
+
+function updateChirpDarkening(ledLayer, chirpOrbitLift) {
+  if (!ledLayer.material) return;
+  const darken = clamp(chirpOrbitLift / Math.max(.001, SPHERE_CHIRP_ORBIT_LIFT_SCALE), 0, 1);
+  const visibility = SPHERE_EVENT_LAYER_VISIBILITY[ledLayer.layer.id] ? ledLayer.eventVisibility || 0 : 1;
+  ledLayer.material.opacity = clamp(ledLayer.baseOpacity * visibility * (1 + darken * SPHERE_CHIRP_DARKEN_SCALE), 0, .82);
+}
+
+function updateEventLayerOpacity(ledLayer, { layerEnergy, layerPeak, active }) {
+  const visibility = SPHERE_EVENT_LAYER_VISIBILITY[ledLayer.layer.id];
+  if (!visibility || !ledLayer.material) return;
+  const energyVisibility = smoothstep(clamp(layerEnergy / visibility.reference, 0, 1));
+  const peakVisibility = smoothstep(clamp(layerPeak / (visibility.reference * 1.6), 0, 1));
+  const target = Math.max(visibility.floor, energyVisibility, peakVisibility) * active;
+  ledLayer.eventVisibility = lerp(ledLayer.eventVisibility || 0, target, target > (ledLayer.eventVisibility || 0) ? .68 : .42);
+  ledLayer.material.opacity = ledLayer.baseOpacity * ledLayer.eventVisibility;
+}
+
+function updateSurfaceOrbit(ledLayer, { left, right, layerEnergy, active }) {
+  const length = Math.min(left.length, right.length);
+  const sampleCount = Math.min(192, length);
+  let absoluteSum = 0;
+  let slopeSum = 0;
+  let previous = 0;
+
+  for (let i = length - sampleCount; i < length; i += 1) {
+    const mono = ((left[i] || 0) + (right[i] || 0)) * .5;
+    absoluteSum += Math.abs(mono);
+    if (i > length - sampleCount) slopeSum += Math.abs(mono - previous);
+    previous = mono;
+  }
+
+  const divisor = Math.max(1, sampleCount);
+  const absoluteMean = absoluteSum / divisor;
+  const slopeMean = slopeSum / divisor;
+  const motionActive = state.playing ? active : .28;
+  const targetDrive = clamp(
+    absoluteMean / .012 * .58 +
+    slopeMean / .018 * .24 +
+    layerEnergy / .014 * .18,
+    0,
+    1
+  ) * motionActive;
+  const baseDrive = surfaceOrbitBaseDrive(ledLayer.layer.id) * Math.max(.35, active);
+  const breathDrive = ledLayer.layer.id === "breath" ? breathEnvelopeSlopeDrive() : 0;
+  const breathMotionDrive = ledLayer.layer.id === "breath" && breathDrive > .04
+    ? Math.max(SPHERE_BREATH_ORBIT_MIN_DRIVE, smoothstep(breathDrive)) * active
+    : 0;
+  const orbitTargetDrive = ledLayer.layer.id === "chirp"
+    ? Math.max(targetDrive, (SPHERE_CHIRP_IDLE_ORBIT_DRIVE + clamp(layerEnergy / .006, 0, 1) * .66) * motionActive)
+    : ledLayer.layer.id === "breath"
+      ? breathMotionDrive
+      : Math.max(baseDrive, targetDrive);
+
+  const orbitDriveBlend = ledLayer.layer.id === "chirp"
+    ? .55
+    : ledLayer.layer.id === "breath"
+      ? (orbitTargetDrive > (ledLayer.orbitDrive || 0) ? .095 : .045)
+      : .12;
+  ledLayer.orbitDrive = lerp(ledLayer.orbitDrive || 0, orbitTargetDrive, orbitDriveBlend);
+  const orbitSpeed = surfaceOrbitSpeed(ledLayer.layer.id);
+  const orbitRadius = surfaceOrbitRadius(ledLayer.layer.id);
+  const idleOrbitStep = ledLayer.layer.id === "chirp"
+    ? SPHERE_CHIRP_IDLE_ORBIT_STEP * Math.max(.35, active)
+    : ledLayer.layer.id === "breath"
+      ? SPHERE_BREATH_ORBIT_STEP * breathMotionDrive
+      : SPHERE_ORBIT_BASE_STEP * Math.max(.35, active);
+  ledLayer.orbitPhase = positiveModulo(
+    (ledLayer.orbitPhase || 0) +
+    (
+      idleOrbitStep +
+      (absoluteMean / .012 * .022 + slopeMean / .018 * .012 + layerEnergy / .014 * .01) * motionActive
+    ) * orbitSpeed,
+    1
+  );
+
+  return {
+    drive: ledLayer.orbitDrive || 0,
+    phase: ledLayer.orbitPhase || 0,
+    radius: orbitRadius,
+    layerId: ledLayer.layer.id,
+    sharedPhase: sphereState.plasmaPhase,
+  };
+}
+
+function surfaceOrbitSpeed(layerId) {
+  if (layerId === "harmonic") return SPHERE_HARMONIC_ORBIT_SPEED;
+  if (layerId === "chirp") return SPHERE_CHIRP_ORBIT_SPEED;
+  if (layerId === "pad") return SPHERE_PAD_ORBIT_SPEED;
+  if (layerId === "breath") return SPHERE_BREATH_ORBIT_SPEED;
+  return SPHERE_DEFAULT_ORBIT_SPEED;
+}
+
+function surfaceOrbitBaseDrive(layerId) {
+  if (layerId === "harmonic") return SPHERE_ORBIT_BASE_DRIVE;
+  if (layerId === "pad") return SPHERE_ORBIT_BASE_DRIVE * .72;
+  if (layerId === "carrier") return SPHERE_ORBIT_BASE_DRIVE * .46;
+  return 0;
+}
+
+function surfaceOrbitRadius(layerId) {
+  if (layerId === "harmonic") return SPHERE_HARMONIC_ORBIT_RADIUS;
+  if (layerId === "chirp") return SPHERE_CHIRP_ORBIT_RADIUS;
+  if (layerId === "pad") return SPHERE_PAD_ORBIT_RADIUS;
+  if (layerId === "breath") return SPHERE_BREATH_ORBIT_RADIUS;
+  return SPHERE_DEFAULT_ORBIT_RADIUS;
+}
+
+function surfaceOrbitOffset({ nx, ny, nz, phase, surfaceOrbit }) {
+  const radiusVariance = surfaceOrbit.layerId === "breath"
+    ? .72 + positiveModulo(phase * 5.37, 1) * .56
+    : .28 + Math.pow(positiveModulo(phase * 5.37, 1), .72) * 1.92;
+  const spinVariance = .55 + positiveModulo(phase * 7.91, 1) * 1.05;
+  const radius = surfaceOrbit.radius * surfaceOrbit.drive * radiusVariance;
+  if (radius <= .0001) return { x: 0, y: 0, z: 0 };
+
+  const layerPhase = SPHERE_PLASMA_LAYER_PHASE[surfaceOrbit.layerId] || 0;
+  const angle = (
+    surfaceOrbit.sharedPhase +
+    surfaceOrbit.phase * spinVariance +
+    layerPhase +
+    phase
+  ) * TWO_PI;
+  const tangentA = tangentFromAxis({ x: 0, y: 1, z: 0 }, nx, ny, nz);
+  const tangentB = {
+    x: ny * tangentA.z - nz * tangentA.y,
+    y: nz * tangentA.x - nx * tangentA.z,
+    z: nx * tangentA.y - ny * tangentA.x,
+  };
+  const x = Math.cos(angle) * tangentA.x - Math.sin(angle) * tangentB.x;
+  const y = Math.cos(angle) * tangentA.y - Math.sin(angle) * tangentB.y;
+  const z = Math.cos(angle) * tangentA.z - Math.sin(angle) * tangentB.z;
+
+  return {
+    x: x * radius,
+    y: y * radius,
+    z: z * radius,
+  };
+}
+
+function tangentFromAxis(axis, nx, ny, nz) {
+  let x = axis.y * nz - axis.z * ny;
+  let y = axis.z * nx - axis.x * nz;
+  let z = axis.x * ny - axis.y * nx;
+  const length = Math.hypot(x, y, z);
+
+  if (length < .001) {
+    x = -ny;
+    y = nx;
+    z = 0;
+  }
+
+  const fallbackLength = Math.max(.001, Math.hypot(x, y, z));
+  return {
+    x: x / fallbackLength,
+    y: y / fallbackLength,
+    z: z / fallbackLength,
+  };
+}
+
+function updateSurfaceTrails(ledLayer) {
+  if (!ledLayer.trailHistory) return;
+
+  for (let trailIndex = 0; trailIndex < ledLayer.trails.length; trailIndex += 1) {
+    const trail = ledLayer.trails[trailIndex];
+    const trailPositions = trail.geometry.attributes.position.array;
+    const historyIndex = Math.min(ledLayer.trailHistory.length - 1, (trailIndex + 1) * SPHERE_HARMONIC_TRAIL_FRAME_STEP - 1);
+    const snapshot = ledLayer.trailHistory[historyIndex];
+    const neighborSnapshot = ledLayer.trailHistory[Math.max(0, historyIndex - SPHERE_HARMONIC_TRAIL_FRAME_STEP)];
+
+    for (let i = 0; i < trail.pointIndices.length; i += 1) {
+      const pointIndex = trail.pointIndices[i];
+      const neighborPointIndex = trail.pointIndices[(i + 11 + trailIndex * 7) % trail.pointIndices.length];
+      const sourceOffset = pointIndex * 3;
+      const neighborOffset = neighborPointIndex * 3;
+      const trailOffset = i * 3;
+      const absorbed = harmonicTrailAbsorption({
+        source: snapshot,
+        sourceOffset,
+        neighbor: neighborSnapshot,
+        neighborOffset,
+        age: trailIndex / Math.max(1, ledLayer.trails.length - 1),
+      });
+
+      trailPositions[trailOffset] = absorbed.x;
+      trailPositions[trailOffset + 1] = absorbed.y;
+      trailPositions[trailOffset + 2] = absorbed.z;
+    }
+
+    trail.geometry.attributes.position.needsUpdate = true;
+  }
+
+  const currentPositions = ledLayer.geometry.attributes.position.array;
+  const newestSnapshot = ledLayer.trailHistory.pop();
+  newestSnapshot.set(currentPositions);
+  ledLayer.trailHistory.unshift(newestSnapshot);
+}
+
+function harmonicTrailAbsorption({ source, sourceOffset, neighbor, neighborOffset, age }) {
+  const sx = source[sourceOffset];
+  const sy = source[sourceOffset + 1];
+  const sz = source[sourceOffset + 2];
+  const nx = neighbor[neighborOffset];
+  const ny = neighbor[neighborOffset + 1];
+  const nz = neighbor[neighborOffset + 2];
+  const distance = Math.hypot(nx - sx, ny - sy, nz - sz);
+  const closeness = 1 - smoothstep(distance / SPHERE_HARMONIC_TRAIL_ABSORB_DISTANCE);
+  const pull = closeness * SPHERE_HARMONIC_TRAIL_ABSORB_STRENGTH * (.35 + age * .65);
+
+  return {
+    x: lerp(sx, nx, pull),
+    y: lerp(sy, ny, pull),
+    z: lerp(sz, nz, pull),
+  };
 }
 
 function resetSphereDisplacementMemory() {
   if (sphereState.displacements) sphereState.displacements.fill(0);
   sphereState.ledLayers.forEach((ledLayer) => {
+    const baseRadius = ledLayer.layer.id === "breath" ? SPHERE_BREATH_CORE_RADIUS : SPHERE_RADIUS;
+    const positions = ledLayer.geometry.attributes.position.array;
+
     ledLayer.displacements.fill(0);
     ledLayer.swell = 0;
+    ledLayer.orbitDrive = 0;
+    ledLayer.orbitPhase = 0;
+    ledLayer.pingJump = 0;
+    ledLayer.eventVisibility = 0;
+    for (let i = 0; i < ledLayer.directions.length; i += 3) {
+      positions[i] = ledLayer.directions[i] * baseRadius;
+      positions[i + 1] = ledLayer.directions[i + 1] * baseRadius;
+      positions[i + 2] = ledLayer.directions[i + 2] * baseRadius;
+    }
+    ledLayer.geometry.attributes.position.needsUpdate = true;
+    if (ledLayer.trailHistory) {
+      ledLayer.trailHistory.forEach((snapshot) => snapshot.set(positions));
+    }
+    if (ledLayer.trails) {
+      ledLayer.trails.forEach((trail) => {
+        trail.positions.fill(0);
+        trail.geometry.attributes.position.needsUpdate = true;
+      });
+    }
   });
 }
 
 function latestLiveSample(samples) {
   const index = positiveModulo(state.liveWriteIndex - 1, samples.length);
   return samples[index] || 0;
+}
+
+function breathEnvelopeSlopeDrive() {
+  const samples = state.liveBreathEnvelope;
+  const latestIndex = positiveModulo(state.liveWriteIndex - 1, samples.length);
+  const latest = samples[latestIndex] || 0;
+  const shortPrevious = samples[positiveModulo(latestIndex - 1024, samples.length)] || 0;
+  const longPrevious = samples[positiveModulo(latestIndex - 3072, samples.length)] || 0;
+  const delta = Math.max(
+    Math.abs(latest - shortPrevious) * 1.6,
+    Math.abs(latest - longPrevious)
+  );
+  return clamp(delta / SPHERE_BREATH_ORBIT_SLOPE_REFERENCE, 0, 1);
 }
 
 function sphereSignalMetrics(left, right) {
