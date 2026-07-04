@@ -348,6 +348,11 @@ select {
   cursor: pointer;
 }
 
+.controls > .toggle {
+  min-height: 44px;
+  padding-block: 5px;
+}
+
 .toggle input {
   position: absolute;
   inline-size: 1px;
@@ -640,6 +645,11 @@ select {
     min-height: 30px;
     padding: 0;
     font-size: 12px;
+  }
+
+  .controls > .toggle {
+    min-height: 40px;
+    padding-block: 5px;
   }
 
   .field {
