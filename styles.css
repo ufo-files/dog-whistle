@@ -532,13 +532,10 @@ select {
 }
 
 .site-motto {
-  position: fixed;
-  left: 12px;
-  bottom: 80px;
-  z-index: 6;
   display: flex;
   gap: 12px;
   align-items: center;
+  margin-top: 3px;
   color: var(--muted);
   font: 12px/1 var(--font);
   text-transform: uppercase;
@@ -625,8 +622,6 @@ select {
   }
 
   .site-motto {
-    left: 8px;
-    bottom: 177px;
     font-size: 11px;
   }
 
