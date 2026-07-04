@@ -580,7 +580,7 @@ select {
   justify-content: space-between;
   gap: 12px;
   align-items: center;
-  margin-top: 10px;
+  margin-top: 6px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
   color: var(--muted);
