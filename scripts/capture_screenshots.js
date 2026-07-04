@@ -92,7 +92,7 @@ async function main() {
 
     await page.goto(baseUrl, { waitUntil: "networkidle" });
     await page.waitForSelector("#play", { timeout: 30000 });
-    await page.click("#play");
+    await page.locator("#play").evaluate((button) => button.click());
     await page.waitForFunction(() => document.querySelector("#status")?.textContent?.includes("straight audio"));
     await page.waitForTimeout(1200);
 
