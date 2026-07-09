@@ -87,8 +87,23 @@ main {
 }
 
 .brand {
-  display: block;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.brand-logo {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.brand .switcher {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 h1 {
@@ -612,7 +627,13 @@ select {
   }
 
   .brand {
-    display: block;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .brand-logo {
+    width: 38px;
+    height: 38px;
   }
 
   h1 {
