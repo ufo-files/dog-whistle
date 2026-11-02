@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   capture:
-    runs-on: ufo-agent-1-dog-whistle
+    runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     steps:
       - name: Checkout
@@ -37,7 +37,7 @@ jobs:
         run: npm ci
 
       - name: Install browser
-        run: npx playwright install chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Capture screenshots
         run: npm run screenshots
